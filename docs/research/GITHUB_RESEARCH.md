@@ -62,7 +62,7 @@
 - [Krayin CRM](https://github.com/krayin/laravel-crm)，固定版本 `2c1209102a77969665b880af9dda730cf9748a04`，MIT：把 Lead、Pipeline/Stage、Activity、Quote 和预计成交时间分开；活动包含类型、计划时间、完成状态，Lead 另有 won/lost 和停滞判断。
 - Lydia 改造：不引入 Docker、Supabase、PostgreSQL、PHP、Laravel、多用户权限或上游界面代码。Lead schema 4 只增加本地 `development`：冻结导入时等级、追加式开发事件、可完成的下一步、阶段推导和按初始等级统计的真实转化。
 - 关键修正：成熟 CRM 常显示成交概率，但 Lydia 没有足够历史样本，因此不采用固定概率。A/B/C/D 只作为导入时排序基线；回复率、报价率、样品率和成交率只由人工记录的真实后续结果计算。
-- 数据去向：所有开发记录留在当前浏览器与导出 JSON；没有向 Atomic CRM、Krayin CRM 或其服务发送询盘、联系人、金额或备注。
+- 数据去向：所有开发记录留在当前客户空间与导出 JSON；没有向 Atomic CRM、Krayin CRM 或其服务发送询盘、联系人、金额或备注。
 - 代码范围：没有复制或捆绑两个上游项目的代码。MIT 文本仍存档，便于以后若真正引入代码时审查来源和义务。
 
 ## 只研究、不复制

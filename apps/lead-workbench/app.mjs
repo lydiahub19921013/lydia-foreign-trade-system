@@ -33,7 +33,10 @@ import {
 } from "/packages/lead-core/src/index.mjs";
 import {
   PERSISTED_UI_FIELD_IDS,
+  assertPayloadMatchesWorkspace,
   createIndexedDbPersistence,
+  createWorkspaceFilename,
+  createWorkspaceReference,
   createWorkbenchSnapshot
 } from "./persistence.mjs";
 
@@ -51,6 +54,9 @@ let pendingEvidenceAction = null;
 let pendingDuplicateAction = null;
 let pendingDevelopmentLeadId = null;
 let workbenchPersistence = null;
+let workspaceIndex = null;
+let activeWorkspace = null;
+let workspaceDialogMode = null;
 let persistenceReady = false;
 let persistenceBlocked = false;
 let persistenceDirtyBeforeReady = false;
@@ -92,6 +98,32 @@ function persistenceMessage(message, type = "neutral") {
   updateStatus("#persistenceStatus", message, type);
 }
 
+function workspaceMessage(message, type = "neutral") {
+  updateStatus("#workspaceStatus", message, type);
+}
+
+function renderWorkspaceControls() {
+  const selector = $("#workspaceSelect");
+  selector.replaceChildren();
+  activeWorkspace = workspaceIndex?.workspaces.find((workspace) => workspace.id === workspaceIndex.activeWorkspaceId) || null;
+  for (const workspace of workspaceIndex?.workspaces || []) {
+    const option = document.createElement("option");
+    option.value = workspace.id;
+    option.textContent = workspace.name;
+    selector.append(option);
+  }
+  if (activeWorkspace) {
+    selector.value = activeWorkspace.id;
+    $("#activeWorkspaceName").textContent = activeWorkspace.name;
+    $("#workspaceDeleteName").textContent = activeWorkspace.name;
+    $("#clearWorkspaceName").textContent = activeWorkspace.name;
+  }
+  selector.disabled = !activeWorkspace;
+  $("#renameWorkspace").disabled = !activeWorkspace;
+  $("#deleteWorkspace").disabled = !activeWorkspace || workspaceIndex.workspaces.length <= 1;
+  $("#createWorkspace").disabled = !workspaceIndex;
+}
+
 async function drainPersistence() {
   if (!persistenceReady || persistenceBlocked || !workbenchPersistence || restoringSnapshot) return;
   while (persistedRevision < persistenceRevision) {
@@ -99,10 +131,10 @@ async function drainPersistence() {
     const snapshot = createWorkbenchSnapshot(workbenchStateForPersistence());
     try {
       persistenceMessage("正在保存到这个浏览器……");
-      const saved = await workbenchPersistence.save(snapshot);
+      const saved = await workbenchPersistence.saveWorkspace(activeWorkspace.id, snapshot);
       persistedRevision = revision;
       const time = new Date(saved.savedAt).toLocaleString("zh-CN");
-      persistenceMessage(`已自动保存 · ${time} · 未上传`, "success");
+      persistenceMessage(`“${activeWorkspace.name}”已自动保存 · ${time} · 未上传`, "success");
       $("#clearLocalData").disabled = false;
     } catch {
       persistenceBlocked = true;
@@ -132,6 +164,20 @@ function schedulePersistence() {
   ensurePersistenceDrain();
 }
 
+async function flushCurrentWorkspace() {
+  if (!persistenceReady || !workbenchPersistence || !activeWorkspace) {
+    throw new Error("客户空间还没有准备好");
+  }
+  if (persistenceBlocked) throw new Error("当前自动保存失败，请先导出 JSON 再切换客户");
+  schedulePersistence();
+  while (persistenceDrain) await persistenceDrain;
+  if (persistenceBlocked) throw new Error("当前客户数据保存失败，请先导出 JSON 再切换客户");
+}
+
+function assertPayloadWorkspace(payload) {
+  assertPayloadMatchesWorkspace(payload, activeWorkspace);
+}
+
 function leadsFromJson(payload) {
   if (Array.isArray(payload)) return payload.map(normalizeLead);
   if (Array.isArray(payload.leads)) return payload.leads.map(normalizeLead);
@@ -146,7 +192,9 @@ async function parseFile(file) {
   if (file.name.toLowerCase().endsWith(".csv")) {
     return leadsFromCsv(text, { channel: $("#channel").value });
   }
-  return leadsFromJson(JSON.parse(text));
+  const payload = JSON.parse(text);
+  assertPayloadWorkspace(payload);
+  return leadsFromJson(payload);
 }
 
 function buildResult(leads, sourceFile) {
@@ -251,26 +299,34 @@ function restoreWorkbenchSnapshot(snapshot) {
 async function initializePersistence() {
   try {
     workbenchPersistence = createIndexedDbPersistence(window.indexedDB);
-    const snapshot = await workbenchPersistence.load();
+    workspaceIndex = await workbenchPersistence.initializeWorkspaces();
+    renderWorkspaceControls();
+    const snapshot = await workbenchPersistence.loadWorkspace(activeWorkspace.id);
     if (snapshot && !persistenceDirtyBeforeReady) restoreWorkbenchSnapshot(snapshot);
     persistenceReady = true;
+    workspaceMessage(`当前只显示“${activeWorkspace.name}”的数据；切换空间会先保存再重新载入。`, "success");
     if (snapshot) {
       $("#clearLocalData").disabled = false;
       if (!currentResult && !currentProspectResult && !currentRelationshipResult) {
-        persistenceMessage(`已读取本机快照 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")}`, "success");
+        persistenceMessage(`已读取“${activeWorkspace.name}”本机快照 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")}`, "success");
       } else {
-        persistenceMessage(`已自动恢复 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")} · 未上传`, "success");
+        persistenceMessage(`“${activeWorkspace.name}”已自动恢复 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")} · 未上传`, "success");
       }
     } else {
-      persistenceMessage("自动保存已开启 · 尚无本机数据 · 未上传", "success");
+      persistenceMessage(`“${activeWorkspace.name}”自动保存已开启 · 尚无本机数据 · 未上传`, "success");
     }
     if (persistenceDirtyBeforeReady) schedulePersistence();
   } catch (error) {
     persistenceBlocked = true;
-    $("#clearLocalData").disabled = !workbenchPersistence;
+    $("#workspaceSelect").disabled = true;
+    $("#createWorkspace").disabled = true;
+    $("#renameWorkspace").disabled = true;
+    $("#deleteWorkspace").disabled = true;
+    $("#clearLocalData").disabled = !workbenchPersistence || !activeWorkspace;
     const recovery = workbenchPersistence
-      ? "请先导出已有数据；可用“清除本机数据”重新开始。"
+      ? "请先导出已有数据；不要切换客户空间。"
       : "请继续使用 JSON 导出备份，不要把当前页面当作已经自动保存。";
+    workspaceMessage("客户空间初始化失败，当前页面不能证明客户数据已经隔离。", "error");
     persistenceMessage(`${error.message || "无法读取本机数据"}。${recovery}`, "error");
   }
 }
@@ -1070,13 +1126,25 @@ function downloadResult() {
     currentResult.results.map((item) => item.lead),
     { now: currentResult.generatedAt }
   );
-  downloadJson(currentResult, `Lydia-客户分级-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentResult, workspaceFilename("客户分级"));
   setStatus("Lydia 分级结果已导出，可在外贸开发插件中导入。", "success");
   schedulePersistence();
 }
 
+function workspaceFilename(label) {
+  return createWorkspaceFilename(activeWorkspace, label);
+}
+
+function payloadWithWorkspace(payload) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) || !activeWorkspace) return payload;
+  return {
+    ...payload,
+    workspace: createWorkspaceReference(activeWorkspace)
+  };
+}
+
 function downloadJson(payload, filename) {
-  const blob = new Blob([`${JSON.stringify(payload, null, 2)}\n`], { type: "application/json" });
+  const blob = new Blob([`${JSON.stringify(payloadWithWorkspace(payload), null, 2)}\n`], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -1257,9 +1325,14 @@ async function loadProspectFile(file) {
   try {
     const text = await file.text();
     const defaults = currentProspectPlan?.context || {};
-    const prospects = file.name.toLowerCase().endsWith(".csv")
-      ? prospectsFromCsv(text, defaults)
-      : prospectsFromJson(JSON.parse(text), defaults);
+    let prospects;
+    if (file.name.toLowerCase().endsWith(".csv")) {
+      prospects = prospectsFromCsv(text, defaults);
+    } else {
+      const payload = JSON.parse(text);
+      assertPayloadWorkspace(payload);
+      prospects = prospectsFromJson(payload, defaults);
+    }
     showProspectResults(prospects, file.name);
   } catch (error) {
     updateStatus("#prospectStatus", error.message || "候选文件导入失败。", "error");
@@ -1762,7 +1835,9 @@ async function generateAndCheckEmailCandidates(event) {
 async function relationshipPathsFromFile(file) {
   const text = await file.text();
   if (file.name.toLowerCase().endsWith(".csv")) return relationshipsFromCsv(text);
-  return relationshipsFromJson(JSON.parse(text));
+  const payload = JSON.parse(text);
+  assertPayloadWorkspace(payload);
+  return relationshipsFromJson(payload);
 }
 
 function relationshipCard(path) {
@@ -1853,7 +1928,7 @@ $("#loadProspectSample").addEventListener("click", async () => {
 });
 $("#exportProspects").addEventListener("click", () => {
   if (!currentProspectResult) return;
-  downloadJson(currentProspectResult, `Lydia-公开候选-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentProspectResult, workspaceFilename("公开候选"));
   updateStatus("#prospectStatus", "公开候选已导出；搜索摘要仍需回到原始页面核查。", "success");
 });
 
@@ -1894,14 +1969,14 @@ $("#dropZone").addEventListener("drop", (event) => loadSelectedFile(event.dataTr
 $("#companyResearchForm").addEventListener("submit", searchCompany);
 $("#exportCompanyEvidence").addEventListener("click", () => {
   if (!currentCompanyResearch) return;
-  downloadJson(currentCompanyResearch, `Lydia-企业核验-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentCompanyResearch, workspaceFilename("企业核验"));
   updateStatus("#companyStatus", "企业核验证据已导出；使用前仍需人工确认是否为同一家公司。", "success");
 });
 
 $("#websiteResearchForm").addEventListener("submit", searchWebsite);
 $("#exportWebsiteEvidence").addEventListener("click", () => {
   if (!currentWebsiteResearch) return;
-  downloadJson(currentWebsiteResearch, `Lydia-官网证据-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentWebsiteResearch, workspaceFilename("官网证据"));
   updateStatus("#websiteStatus", "官网候选证据已导出；公开联系方式仍不等于营销同意。", "success");
 });
 
@@ -1909,7 +1984,7 @@ $("#emailTargetLead").addEventListener("change", () => prefillEmailInputs(true))
 $("#emailCandidateForm").addEventListener("submit", generateAndCheckEmailCandidates);
 $("#exportEmailCandidates").addEventListener("click", () => {
   if (!currentEmailResearch) return;
-  downloadJson(currentEmailResearch, `Lydia-候选邮箱-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentEmailResearch, workspaceFilename("候选邮箱"));
   updateStatus("#emailStatus", "候选邮箱已导出；使用前仍需取得合规基础并人工复核。", "success");
 });
 
@@ -1925,7 +2000,7 @@ $("#loadRelationshipSample").addEventListener("click", async () => {
 });
 $("#exportRelationshipPaths").addEventListener("click", () => {
   if (!currentRelationshipResult) return;
-  downloadJson(currentRelationshipResult, `Lydia-信任路径-${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJson(currentRelationshipResult, workspaceFilename("信任路径"));
   updateStatus("#relationshipStatus", "候选路径已导出。下一步仍应先征得关系人明确同意。", "success");
 });
 
@@ -1951,6 +2026,89 @@ for (const id of PERSISTED_UI_FIELD_IDS.filter((field) => !["gradeFilter", "deve
   $(`#${id}`).addEventListener("change", schedulePersistence);
 }
 
+function openWorkspaceDialog(mode) {
+  workspaceDialogMode = mode;
+  $("#workspaceDialogLabel").textContent = mode === "create" ? "新增客户空间" : "重命名客户空间";
+  $("#workspaceDialogTitle").textContent = mode === "create" ? "为另一个客户建立独立空间" : "修改当前客户空间名称";
+  $("#workspaceName").value = mode === "create" ? "" : activeWorkspace?.name || "";
+  $("#workspaceDialogStatus").textContent = "";
+  $("#confirmWorkspaceAction").textContent = mode === "create" ? "新建并切换" : "保存名称";
+  $("#workspaceDialog").showModal();
+  $("#workspaceName").focus();
+}
+
+$("#workspaceSelect").addEventListener("change", async (event) => {
+  const targetWorkspaceId = event.target.value;
+  if (!activeWorkspace || targetWorkspaceId === activeWorkspace.id) return;
+  event.target.disabled = true;
+  workspaceMessage("正在保存当前客户并切换……");
+  try {
+    await flushCurrentWorkspace();
+    await workbenchPersistence.setActiveWorkspace(targetWorkspaceId);
+    window.location.reload();
+  } catch (error) {
+    event.target.value = activeWorkspace.id;
+    renderWorkspaceControls();
+    workspaceMessage(error.message || "无法切换客户空间。", "error");
+  }
+});
+
+$("#createWorkspace").addEventListener("click", () => openWorkspaceDialog("create"));
+$("#renameWorkspace").addEventListener("click", () => openWorkspaceDialog("rename"));
+$("#cancelWorkspaceAction").addEventListener("click", () => {
+  workspaceDialogMode = null;
+  $("#workspaceDialog").close();
+});
+$("#workspaceForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#confirmWorkspaceAction");
+  button.disabled = true;
+  updateStatus("#workspaceDialogStatus", workspaceDialogMode === "create" ? "正在建立独立客户空间……" : "正在保存客户空间名称……");
+  try {
+    await flushCurrentWorkspace();
+    if (workspaceDialogMode === "create") {
+      await workbenchPersistence.createWorkspace($("#workspaceName").value);
+      updateStatus("#workspaceDialogStatus", "新客户空间已建立，正在切换……", "success");
+      window.location.reload();
+      return;
+    }
+    workspaceIndex = await workbenchPersistence.renameWorkspace(activeWorkspace.id, $("#workspaceName").value);
+    renderWorkspaceControls();
+    workspaceDialogMode = null;
+    $("#workspaceDialog").close();
+    workspaceMessage(`当前客户空间已重命名为“${activeWorkspace.name}”。`, "success");
+    persistenceMessage(`“${activeWorkspace.name}”名称已更新 · 数据仍保存在此客户空间`, "success");
+  } catch (error) {
+    updateStatus("#workspaceDialogStatus", error.message || "客户空间操作失败。", "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#deleteWorkspace").addEventListener("click", () => {
+  $("#deleteWorkspaceStatus").textContent = "";
+  $("#deleteWorkspaceDialog").showModal();
+});
+$("#cancelDeleteWorkspace").addEventListener("click", () => $("#deleteWorkspaceDialog").close());
+$("#deleteWorkspaceForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#confirmDeleteWorkspace");
+  button.disabled = true;
+  updateStatus("#deleteWorkspaceStatus", `正在删除“${activeWorkspace.name}”及其本机数据……`);
+  const wasBlocked = persistenceBlocked;
+  try {
+    persistenceBlocked = true;
+    if (persistenceDrain) await persistenceDrain;
+    await workbenchPersistence.deleteWorkspace(activeWorkspace.id);
+    updateStatus("#deleteWorkspaceStatus", "客户空间已删除，正在切换到保留的空间……", "success");
+    window.location.reload();
+  } catch (error) {
+    persistenceBlocked = wasBlocked;
+    updateStatus("#deleteWorkspaceStatus", error.message || "删除客户空间失败。", "error");
+    button.disabled = false;
+  }
+});
+
 $("#clearLocalData").addEventListener("click", () => {
   $("#clearLocalDataStatus").textContent = "";
   $("#clearLocalDataDialog").showModal();
@@ -1960,15 +2118,17 @@ $("#clearLocalDataForm").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = $("#confirmClearLocalData");
   button.disabled = true;
-  updateStatus("#clearLocalDataStatus", "正在清除这个浏览器中的 Lydia 工作台数据……");
+  updateStatus("#clearLocalDataStatus", `正在清除“${activeWorkspace.name}”中的工作台数据……`);
+  const wasBlocked = persistenceBlocked;
   try {
     persistenceBlocked = true;
     if (persistenceDrain) await persistenceDrain;
-    await workbenchPersistence.clear();
-    updateStatus("#clearLocalDataStatus", "本机工作台数据已清除，正在重新载入……", "success");
+    await workbenchPersistence.clearWorkspace(activeWorkspace.id);
+    updateStatus("#clearLocalDataStatus", "当前客户空间的数据已清除，正在重新载入……", "success");
     window.location.reload();
   } catch {
-    updateStatus("#clearLocalDataStatus", "清除失败。已导出的 JSON 不受影响；请关闭其他 Lydia 工作台页面后重试。", "error");
+    persistenceBlocked = wasBlocked;
+    updateStatus("#clearLocalDataStatus", "清除失败。其他客户空间和已导出的 JSON 不受影响；请关闭其他 Lydia 工作台页面后重试。", "error");
     button.disabled = false;
   }
 });

@@ -41,6 +41,24 @@
           <button id="loadSample" class="button ghost" type="button">使用虚构样例</button>
         </div>
 
+        <section class="workspace-panel" aria-labelledby="workspace-title">
+          <div class="workspace-current">
+            <span class="workspace-kicker">当前客户空间</span>
+            <strong id="activeWorkspaceName">正在读取……</strong>
+            <small>每个客户单独保存和恢复；切换前会先保存当前空间。</small>
+          </div>
+          <label class="workspace-picker">
+            <span id="workspace-title">选择客户</span>
+            <select id="workspaceSelect" disabled aria-describedby="workspaceStatus"></select>
+          </label>
+          <div class="workspace-actions">
+            <button id="createWorkspace" class="button primary compact" type="button" disabled>新建客户空间</button>
+            <button id="renameWorkspace" class="button ghost compact" type="button" disabled>重命名</button>
+            <button id="deleteWorkspace" class="button ghost compact" type="button" disabled>删除空间</button>
+          </div>
+          <p id="workspaceStatus" class="status" role="status" aria-live="polite">正在初始化客户隔离……</p>
+        </section>
+
         <label class="channel-row">
           <span>这批询盘来自</span>
           <select id="channel">
@@ -62,9 +80,9 @@
           <div>
             <strong id="local-storage-title"><span class="storage-dot" aria-hidden="true"></span>本机自动保存</strong>
             <p id="persistenceStatus" class="status" role="status" aria-live="polite">正在检查这个浏览器的本机存储……</p>
-            <small>客户、开发活动和研究结果保存在这个浏览器的资料中，不会由工作台上传；本机数据未加密，同一电脑账户可能读取，请定期导出 JSON 备份。</small>
+            <small>客户、开发活动和研究结果只保存在当前客户空间，不会由工作台上传；本机数据未加密，同一电脑账户可能读取，请定期导出带客户空间标记的 JSON 备份。</small>
           </div>
-          <button id="clearLocalData" class="button ghost compact" type="button" disabled>清除本机数据</button>
+          <button id="clearLocalData" class="button ghost compact" type="button" disabled>清除当前客户数据</button>
         </div>
       </section>
 
@@ -425,15 +443,45 @@
       </form>
     </dialog>
 
+    <dialog id="workspaceDialog" class="evidence-dialog" aria-labelledby="workspaceDialogTitle">
+      <form id="workspaceForm" method="dialog">
+        <p id="workspaceDialogLabel" class="section-label">客户空间</p>
+        <h2 id="workspaceDialogTitle">建立独立客户空间</h2>
+        <p class="dialog-description">名称只用于你在本机识别客户。不同空间的数据不会一起展示或导出。</p>
+        <label class="dialog-note">
+          <span>客户或项目名称</span>
+          <input id="workspaceName" maxlength="60" required autocomplete="off" placeholder="例如：客户 A · 户外家具" />
+        </label>
+        <p id="workspaceDialogStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelWorkspaceAction" class="button ghost" type="button">取消</button>
+          <button id="confirmWorkspaceAction" class="button primary" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="deleteWorkspaceDialog" class="evidence-dialog" aria-labelledby="deleteWorkspaceTitle">
+      <form id="deleteWorkspaceForm" method="dialog">
+        <p class="section-label">删除客户空间</p>
+        <h2 id="deleteWorkspaceTitle">删除“<span id="workspaceDeleteName">当前客户</span>”？</h2>
+        <p class="dialog-description">这会删除该客户空间及其中自动保存的全部数据，无法从浏览器恢复。其他客户空间、已导出的 JSON、插件数据和 GitHub 仓库不受影响。</p>
+        <p id="deleteWorkspaceStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelDeleteWorkspace" class="button ghost" type="button">取消</button>
+          <button id="confirmDeleteWorkspace" class="button danger" type="submit">确认删除这个空间</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="clearLocalDataDialog" class="evidence-dialog" aria-labelledby="clearLocalDataTitle">
       <form id="clearLocalDataForm" method="dialog">
         <p class="section-label">本机数据管理</p>
-        <h2 id="clearLocalDataTitle">清除这个浏览器中的工作台数据？</h2>
-        <p class="dialog-description">这会删除自动保存的客户、开发活动、研究结果和当前界面状态。已经导出的 JSON、外贸开发插件数据和 GitHub 仓库不会受影响。</p>
+        <h2 id="clearLocalDataTitle">清除“<span id="clearWorkspaceName">当前客户</span>”的数据？</h2>
+        <p class="dialog-description">这会清空当前空间自动保存的客户、开发活动、研究结果和界面状态，但保留这个客户空间。其他客户空间、已导出的 JSON、外贸开发插件数据和 GitHub 仓库不会受影响。</p>
         <p id="clearLocalDataStatus" class="status" role="status" aria-live="polite"></p>
         <div class="dialog-actions">
           <button id="cancelClearLocalData" class="button ghost" type="button">取消</button>
-          <button id="confirmClearLocalData" class="button danger" type="submit">确认清除本机数据</button>
+          <button id="confirmClearLocalData" class="button danger" type="submit">确认清除当前客户数据</button>
         </div>
       </form>
     </dialog>

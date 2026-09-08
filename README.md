@@ -18,7 +18,8 @@ Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信�
 - 对已入档证据执行有原因、有时间的驳回、恢复和修订；系统只回滚仍由该证据管理的字段，不覆盖后续人工修改；
 - 对重复客户候选人工选择“同一客户”或“不同客户”；同一客户必须指定主账户，次账户原始询盘仍完整保留，决定可以撤销重做；
 - 冻结询盘首次导入时的等级和分数，追加记录联系、回复、报价、样品、订单、成交、流失及下一步待办；按初始等级回看真实转化，误记活动可带原因撤回；
-- 将客户、开发活动、公开候选、研究证据和信任路径自动保存到当前浏览器的 IndexedDB；刷新后自动恢复，联网授权勾选和未知字段不会持久化，并提供二次确认的本机清除入口；
+- 为不同客户建立独立本机客户空间；客户、开发活动、公开候选、研究证据和信任路径分别保存到 IndexedDB，切换时先保存再恢复目标空间，联网授权勾选和未知字段不会持久化；
+- 导出的 JSON 和文件名带客户空间标记；导入另一客户空间的 Lydia JSON 时默认停止，避免把客户资料混入当前空间；
 - 用联系人英文名和企业域名生成有限的候选邮箱，检查域名邮件路由并阻止错配客户；
 - 导入客户自己拥有或授权的通讯录/CRM 关系记录，排除拒绝路径并给出熟人引荐顺序。
 
@@ -38,7 +39,7 @@ npm run qualify -- examples/inquiries.sample.csv --output ./qualification-result
 npm run check
 ```
 
-所有示例均为虚构数据。询盘、候选、研究结果和关系路径只在本机浏览器处理并自动保存，不抓取私人资料、不发送消息。只有使用者主动确认查询时才联网：Exa 接收选中的公开搜索词；GLEIF 接收企业名称和可选司法辖区；指定官网按使用者选择读取一页，或最多 5 张同站的联系/公司/工厂/产品页；邮箱候选只查询企业域名 DNS，联系人姓名不离开浏览器。询盘正文、关系文件和其他联系人资料不会自动发送。浏览器本机数据未加密，不等于云备份或多人数据库，应定期导出 JSON；详细边界见 [本机自动保存](./docs/LOCAL_PERSISTENCE.md)。搜索摘要、官网公开联系方式和生成邮箱全部先视为候选，也不等于营销同意。
+所有示例均为虚构数据。询盘、候选、研究结果和关系路径只在当前本机客户空间处理并自动保存，不抓取私人资料、不发送消息。只有使用者主动确认查询时才联网：Exa 接收选中的公开搜索词；GLEIF 接收企业名称和可选司法辖区；指定官网按使用者选择读取一页，或最多 5 张同站的联系/公司/工厂/产品页；邮箱候选只查询企业域名 DNS，联系人姓名不离开浏览器。询盘正文、关系文件和其他联系人资料不会自动发送。浏览器本机数据未加密，客户空间也不是云备份、账号权限或 SaaS 多租户，应定期导出 JSON；详细边界见 [客户空间](./docs/CUSTOMER_WORKSPACES.md) 和 [本机自动保存](./docs/LOCAL_PERSISTENCE.md)。搜索摘要、官网公开联系方式和生成邮箱全部先视为候选，也不等于营销同意。
 
 ## 系统边界
 
@@ -56,7 +57,7 @@ git subtree pull --prefix apps/communication-extension \
   https://github.com/lydiahub19921013/foreign-trade-development-plugin.git main --squash
 ```
 
-公开资料只能作为线索和证据，不能冒充已确认事实；候选邮箱不能写成“已验证邮箱”。官网结果必须逐条选择后才能进入客户档案，所选证据保留人工决定时间和具体来源。发现错误时应在客户证据中驳回或修订；完整规则见 [证据复核与字段回滚](./docs/EVIDENCE_REVIEW.md)。重复候选也不会自动合并或删除，详见 [重复客户与主账户](./docs/DUPLICATE_REVIEW.md)。开发阶段和结果回测见 [客户开发记录](./docs/DEVELOPMENT_TRACKING.md)，本机保存、恢复和清除见 [本机自动保存](./docs/LOCAL_PERSISTENCE.md)。系统不按姓名、国籍、性别等敏感或无关属性判断客户质量。
+公开资料只能作为线索和证据，不能冒充已确认事实；候选邮箱不能写成“已验证邮箱”。官网结果必须逐条选择后才能进入客户档案，所选证据保留人工决定时间和具体来源。发现错误时应在客户证据中驳回或修订；完整规则见 [证据复核与字段回滚](./docs/EVIDENCE_REVIEW.md)。重复候选也不会自动合并或删除，详见 [重复客户与主账户](./docs/DUPLICATE_REVIEW.md)。开发阶段和结果回测见 [客户开发记录](./docs/DEVELOPMENT_TRACKING.md)，不同客户分区见 [客户空间](./docs/CUSTOMER_WORKSPACES.md)，本机保存、恢复和清除见 [本机自动保存](./docs/LOCAL_PERSISTENCE.md)。系统不按姓名、国籍、性别等敏感或无关属性判断客户质量。
 
 ## 品牌与授权
 
@@ -64,4 +65,4 @@ git subtree pull --prefix apps/communication-extension \
 
 ## 规划
 
-详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[客户开发记录](./docs/DEVELOPMENT_TRACKING.md)、[本机自动保存](./docs/LOCAL_PERSISTENCE.md)、[证据复核](./docs/EVIDENCE_REVIEW.md)、[重复客户](./docs/DUPLICATE_REVIEW.md)、[公开候选](./docs/PUBLIC_PROSPECTS.md)、[官网档案](./docs/WEBSITE_DOSSIER.md)、[候选邮箱](./docs/EMAIL_CANDIDATES.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。
+详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[客户开发记录](./docs/DEVELOPMENT_TRACKING.md)、[客户空间](./docs/CUSTOMER_WORKSPACES.md)、[本机自动保存](./docs/LOCAL_PERSISTENCE.md)、[证据复核](./docs/EVIDENCE_REVIEW.md)、[重复客户](./docs/DUPLICATE_REVIEW.md)、[公开候选](./docs/PUBLIC_PROSPECTS.md)、[官网档案](./docs/WEBSITE_DOSSIER.md)、[候选邮箱](./docs/EMAIL_CANDIDATES.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。

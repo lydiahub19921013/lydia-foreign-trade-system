@@ -34,10 +34,15 @@ for (const relative of requiredFiles) {
 }
 
 const manifest = JSON.parse(await readFile(path.join(target, "manifest.json"), "utf8"));
+const packageManifest = JSON.parse(await readFile(path.join(projectRoot, "package.json"), "utf8"));
 if (manifest.manifest_version !== 3) throw new Error("manifest_version must be 3");
 if (manifest.name !== "外贸开发插件") throw new Error("Unexpected product name");
 if (!/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("Version must use x.y.z format");
+if (manifest.version !== packageManifest.version) throw new Error("Manifest and package versions must match");
 if (manifest.host_permissions?.length) throw new Error("Permanent host_permissions are not allowed");
+
+const sidepanel = await readFile(path.join(target, "src/sidepanel.html"), "utf8");
+if (!sidepanel.includes(`v${manifest.version}`)) throw new Error("Sidepanel version must match manifest");
 
 const allowedPermissions = new Set(["storage", "sidePanel", "contextMenus"]);
 for (const permission of manifest.permissions ?? []) {

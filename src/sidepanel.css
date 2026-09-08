@@ -174,6 +174,8 @@ button {
 input[type="text"],
 input[type="url"],
 input[type="password"],
+input[type="email"],
+input[type="tel"],
 select,
 textarea {
   width: 100%;
@@ -298,6 +300,36 @@ button:disabled {
   font-weight: 750;
 }
 
+.lead-summary {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 11px;
+  border-left: 3px solid var(--orange);
+  border-radius: 8px;
+  background: #fff8f1;
+}
+
+.lead-summary strong {
+  color: var(--green);
+  font-size: 12px;
+}
+
+.lead-summary span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.lead-summary p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.hidden {
+  display: none !important;
+}
+
 .history-list {
   display: grid;
   gap: 8px;
@@ -414,6 +446,20 @@ details > summary small {
 
 .file-button input {
   display: none;
+}
+
+.import-box {
+  margin-bottom: 14px;
+  padding: 11px;
+  border: 1px solid #cadacb;
+  border-radius: 9px;
+  background: #f2f8f2;
+}
+
+.import-box > strong {
+  display: block;
+  color: var(--green);
+  font-size: 12px;
 }
 
 footer {

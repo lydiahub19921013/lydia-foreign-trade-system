@@ -1,5 +1,5 @@
 export const STORAGE_KEY = "foreignTradeDevelopmentState";
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 function text(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
@@ -7,6 +7,32 @@ function text(value, maxLength) {
 
 function list(value) {
   return Array.isArray(value) ? value : [];
+}
+
+function score(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 0;
+}
+
+function normalizeLeadProfile(profile) {
+  if (!profile || typeof profile !== "object") return null;
+  const grade = ["A", "B", "C", "D", "HOLD"].includes(profile.grade) ? profile.grade : "D";
+  return {
+    leadId: text(profile.leadId, 100),
+    grade,
+    score: score(profile.score),
+    source: text(profile.source, 80),
+    sourceReference: text(profile.sourceReference, 1000),
+    product: text(profile.product, 300),
+    quantity: text(profile.quantity, 200),
+    timeline: text(profile.timeline, 200),
+    budget: text(profile.budget, 200),
+    inquiryMessage: text(profile.inquiryMessage, 8000),
+    nextAction: text(profile.nextAction, 1000),
+    missingEvidence: list(profile.missingEvidence).slice(0, 20).map((item) => text(item, 200)).filter(Boolean),
+    evidenceCount: Math.max(0, Math.min(999, Number(profile.evidenceCount) || 0)),
+    importedAt: text(profile.importedAt, 40)
+  };
 }
 
 export function createInitialState() {
@@ -37,7 +63,10 @@ function normalizeCustomer(customer) {
     name: text(customer?.name, 80),
     company: text(customer?.company, 120),
     country: text(customer?.country, 80),
+    email: text(customer?.email, 254).toLowerCase(),
+    whatsapp: text(customer?.whatsapp, 80),
     notes: text(customer?.notes, 1000),
+    leadProfile: normalizeLeadProfile(customer?.leadProfile),
     createdAt: text(customer?.createdAt, 40) || now,
     updatedAt: text(customer?.updatedAt, 40) || now
   };
@@ -131,4 +160,61 @@ export function importPortableData(payload, currentState) {
   imported.settings.ai.apiKey = current.settings.ai.apiKey;
   imported.settings.ai.enabled = false;
   return imported;
+}
+
+function leadNotes(lead, qualification) {
+  return [
+    lead.inquiry?.product ? `产品：${lead.inquiry.product}` : "",
+    lead.inquiry?.quantity ? `数量：${lead.inquiry.quantity}` : "",
+    qualification.nextAction ? `下一步：${qualification.nextAction}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+export function importQualifiedLeads(payload, currentState, now = new Date().toISOString()) {
+  if (payload?.format !== "lydia-qualified-leads" || !Array.isArray(payload.results)) {
+    throw new Error("这不是有效的 Lydia 客户分级文件");
+  }
+
+  let next = migrateState(currentState);
+  let importedCount = 0;
+  let updatedCount = 0;
+
+  for (const item of payload.results.slice(0, 500)) {
+    const lead = item?.lead;
+    const qualification = item?.qualification;
+    if (!lead || !qualification || typeof lead !== "object" || typeof qualification !== "object") continue;
+
+    const leadId = text(lead.id, 100);
+    if (!leadId) continue;
+    const existing = next.customers.find((customer) => customer.id === leadId);
+    const result = upsertCustomer(next, {
+      id: leadId,
+      name: text(lead.contact?.name, 80) || existing?.name,
+      company: text(lead.organization?.name, 120) || existing?.company,
+      country: text(lead.organization?.country, 80) || existing?.country,
+      email: text(lead.contact?.email, 254) || existing?.email,
+      whatsapp: text(lead.contact?.whatsapp, 80) || existing?.whatsapp,
+      notes: existing?.notes || leadNotes(lead, qualification),
+      leadProfile: {
+        leadId,
+        grade: qualification.grade,
+        score: qualification.score,
+        source: lead.source,
+        sourceReference: lead.sourceReference,
+        product: lead.inquiry?.product,
+        quantity: lead.inquiry?.quantity,
+        timeline: lead.inquiry?.timeline,
+        budget: lead.inquiry?.budget,
+        inquiryMessage: lead.inquiry?.message,
+        nextAction: qualification.nextAction,
+        missingEvidence: qualification.missingEvidence,
+        evidenceCount: Array.isArray(lead.evidence) ? lead.evidence.length : 0,
+        importedAt: now
+      }
+    }, now);
+    next = result.state;
+    existing ? updatedCount += 1 : importedCount += 1;
+  }
+
+  return { state: next, importedCount, updatedCount };
 }

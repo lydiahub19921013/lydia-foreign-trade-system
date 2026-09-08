@@ -4,6 +4,7 @@ import {
   addReplyHistory,
   createInitialState,
   exportPortableData,
+  importQualifiedLeads,
   importPortableData,
   migrateState,
   removeReplyHistory,
@@ -51,4 +52,55 @@ test("migration caps stored histories", () => {
   const state = createInitialState();
   state.replyHistory = Array.from({ length: 250 }, (_, index) => ({ id: `h${index}`, reply: "ok" }));
   assert.equal(migrateState(state).replyHistory.length, 200);
+});
+
+test("old customer data migrates to schema 2 without losing fields", () => {
+  const migrated = migrateState({
+    schemaVersion: 1,
+    customers: [{ id: "old", name: "Ana", company: "Example" }]
+  });
+  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.customers[0].name, "Ana");
+  assert.equal(migrated.customers[0].email, "");
+  assert.equal(migrated.customers[0].leadProfile, null);
+});
+
+test("imports Lydia qualified leads while preserving existing manual notes", () => {
+  const initial = createInitialState();
+  initial.customers = [{ id: "lead_1", name: "Old", notes: "人工备注不要覆盖" }];
+  const payload = {
+    format: "lydia-qualified-leads",
+    results: [{
+      lead: {
+        id: "lead_1",
+        source: "Alibaba",
+        sourceReference: "DEMO-001",
+        organization: { name: "Demo Buyer", country: "Exampleland" },
+        contact: { name: "Alex", email: "alex@buyer.example", whatsapp: "+1-555-0100" },
+        inquiry: { message: "Please quote", product: "Bottle", quantity: "2000" },
+        evidence: [{ id: "e1" }]
+      },
+      qualification: {
+        grade: "A",
+        score: 88,
+        nextAction: "准备报价",
+        missingEvidence: ["采购时间"]
+      }
+    }]
+  };
+
+  const imported = importQualifiedLeads(payload, initial, "2026-09-08T00:00:00.000Z");
+  assert.equal(imported.importedCount, 0);
+  assert.equal(imported.updatedCount, 1);
+  assert.equal(imported.state.customers[0].notes, "人工备注不要覆盖");
+  assert.equal(imported.state.customers[0].email, "alex@buyer.example");
+  assert.equal(imported.state.customers[0].leadProfile.grade, "A");
+  assert.equal(imported.state.customers[0].leadProfile.inquiryMessage, "Please quote");
+});
+
+test("rejects unrelated lead files", () => {
+  assert.throws(
+    () => importQualifiedLeads({ format: "other", results: [] }, createInitialState()),
+    /Lydia 客户分级/
+  );
 });

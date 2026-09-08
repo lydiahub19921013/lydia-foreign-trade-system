@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "networkEnabledByDefault": false,
+  "automaticOutreachEnabled": false,
+  "requireEvidenceSource": true,
+  "defaultDataMode": "local",
+  "enabledModules": [
+    "inquiry-qualification",
+    "communication-extension"
+  ],
+  "optionalModules": [
+    "company-website-research",
+    "email-verification",
+    "relationship-paths"
+  ]
+}

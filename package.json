@@ -1,0 +1,16 @@
+{
+  "name": "lydia-foreign-trade-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Lydia 的证据驱动型外贸获客系统",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "qualify": "node apps/inquiry-qualifier/cli.mjs",
+    "test": "node --test packages/lead-core/tests/*.test.mjs integrations/email-sleuth/*.test.mjs",
+    "verify": "node scripts/verify-system.mjs",
+    "check": "npm run test && npm run verify"
+  }
+}

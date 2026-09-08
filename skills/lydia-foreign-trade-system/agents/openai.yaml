@@ -1,0 +1,4 @@
+interface:
+  display_name: "Lydia 外贸系统"
+  short_description: "基于证据完成外贸询盘分级、公开线索研究和信任关系开发"
+  default_prompt: "使用 $lydia-foreign-trade-system 分析这批外贸线索，给出证据、分级和下一步开发建议。"

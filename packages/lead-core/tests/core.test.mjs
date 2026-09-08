@@ -1,0 +1,94 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  createEvidence,
+  leadsFromCsv,
+  normalizeLead,
+  parseCsv,
+  qualifyLead,
+  rankIntroductionPaths
+} from "../src/index.mjs";
+
+test("CSV parser preserves commas and newlines inside quoted inquiry text", () => {
+  const rows = parseCsv('company_name,message\n"Demo Co","Need 2,000 units,\nFOB Shanghai"\n');
+  assert.equal(rows[0].company_name, "Demo Co");
+  assert.equal(rows[0].message, "Need 2,000 units,\nFOB Shanghai");
+});
+
+test("strong evidence and buying signals produce an A lead", () => {
+  const lead = normalizeLead({
+    source: "Alibaba",
+    sourceReference: "DEMO-001",
+    organization: { name: "Demo Buyer", website: "https://buyer.example" },
+    contact: { name: "Alex", role: "Sourcing Manager", email: "alex@buyer.example" },
+    inquiry: {
+      message: "Please quote",
+      product: "Reusable bottle",
+      quantity: "2000",
+      timeline: "30 days",
+      budget: "USD 4-5"
+    },
+    signals: {
+      explicitInquiry: true,
+      replied: true,
+      requestedQuote: true,
+      requestedSample: true,
+      mutualIntroduction: true
+    },
+    evidence: [
+      createEvidence({ kind: "company-website", value: "https://buyer.example", sourceRef: "https://buyer.example/about", status: "verified" }),
+      createEvidence({ kind: "business-registration", value: "DEMO-REG", sourceRef: "registry:demo", status: "verified" }),
+      createEvidence({ kind: "factory", value: "factory profile", sourceRef: "https://buyer.example/factory", status: "verified" }),
+      createEvidence({ kind: "business-email", value: "alex@buyer.example", sourceRef: "company-site", status: "verified" })
+    ]
+  });
+
+  const result = qualifyLead(lead);
+  assert.equal(result.grade, "A");
+  assert.ok(result.score >= 75);
+});
+
+test("do-not-contact always stops qualification", () => {
+  const result = qualifyLead({
+    sourceReference: "DEMO-002",
+    organization: { name: "Demo" },
+    compliance: { doNotContact: true }
+  });
+  assert.equal(result.grade, "HOLD");
+  assert.match(result.reasons.join(" "), /不联系/);
+});
+
+test("country and personal identity do not affect score", () => {
+  const base = {
+    sourceReference: "DEMO-003",
+    organization: { name: "Same Buyer" },
+    inquiry: { product: "Part", quantity: "100" },
+    signals: { explicitInquiry: true }
+  };
+  const left = qualifyLead({ ...base, organization: { ...base.organization, country: "Country A" } });
+  const right = qualifyLead({ ...base, organization: { ...base.organization, country: "Country B" } });
+  assert.equal(left.score, right.score);
+});
+
+test("an imported candidate email is not scored as verified", () => {
+  const [lead] = leadsFromCsv("source,source_reference,company_name,email,email_status\nManual,DEMO-004,Demo Co,buyer@example.com,candidate\n");
+  const result = qualifyLead(lead);
+  assert.equal(result.dimensions.contactabilityAndTrust.score, 2);
+  assert.ok(result.missingEvidence.includes("工作邮箱验证"));
+});
+
+test("relationship paths prioritize strong recent consented relationships", () => {
+  const ranked = rankIntroductionPaths([
+    { connectorId: "weak", targetId: "buyer", relationshipStrength: 2, lastContactAt: "2024-01-01", evidenceIds: ["e1"], consentStatus: "unknown" },
+    { connectorId: "strong", targetId: "buyer", relationshipStrength: 5, lastContactAt: "2026-08-20", knownPersonally: true, sharedCompany: true, evidenceIds: ["e2"], consentStatus: "approved" }
+  ], { now: "2026-09-08" });
+  assert.equal(ranked[0].connectorId, "strong");
+  assert.match(ranked[0].nextAction, /关系人/);
+});
+
+test("declined relationship paths are excluded", () => {
+  const ranked = rankIntroductionPaths([
+    { connectorId: "no", targetId: "buyer", relationshipStrength: 5, consentStatus: "declined" }
+  ], { now: "2026-09-08" });
+  assert.equal(ranked.length, 0);
+});

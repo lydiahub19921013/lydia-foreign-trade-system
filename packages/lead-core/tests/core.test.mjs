@@ -4,6 +4,7 @@ import {
   createEvidence,
   findDuplicateCandidates,
   leadsFromCsv,
+  mergeEvidenceIntoLead,
   normalizeLead,
   parseCsv,
   qualifyLead,
@@ -154,4 +155,29 @@ test("common Chinese inquiry headers map into the Lydia model", () => {
   assert.equal(lead.contact.name, "林样例");
   assert.equal(lead.inquiry.product, "收纳盒");
   assert.equal(lead.inquiry.quantity, "500");
+});
+
+test("confirmed research evidence fills empty fields without overwriting customer data", () => {
+  const lead = normalizeLead({
+    sourceReference: "DEMO-MERGE",
+    organization: { name: "Customer-entered name", address: "Existing address" },
+    contact: { email: "manual@example.com" }
+  });
+  const evidence = createEvidence({
+    kind: "business-registration",
+    value: "DEMO-REG",
+    sourceRef: "registry:demo",
+    status: "verified"
+  });
+  const merged = mergeEvidenceIntoLead(lead, {
+    organization: { name: "Registry name", address: "Registry address", registrationId: "DEMO-REG" },
+    contact: { email: "public@example.com", whatsapp: "+1-555-0100" },
+    evidence: [evidence, evidence]
+  });
+  assert.equal(merged.organization.name, "Customer-entered name");
+  assert.equal(merged.organization.address, "Existing address");
+  assert.equal(merged.organization.registrationId, "DEMO-REG");
+  assert.equal(merged.contact.email, "manual@example.com");
+  assert.equal(merged.contact.whatsapp, "+1-555-0100");
+  assert.equal(merged.evidence.length, 1);
 });

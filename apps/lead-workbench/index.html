@@ -109,14 +109,47 @@
           <button id="searchCompany" class="button primary" type="submit">查询 GLEIF</button>
         </form>
         <p class="privacy-note">点击查询后，只会把企业名称和可选司法辖区发送给 GLEIF 官方接口；不会发送询盘正文或联系人信息。LEI 是企业身份线索，不是信用、付款能力或采购意愿保证。</p>
+        <label class="target-picker">
+          <span>人工确认后保存到</span>
+          <select id="companyTargetLead" disabled><option value="">请先导入询盘</option></select>
+        </label>
         <p id="companyStatus" class="status" role="status" aria-live="polite">尚未查询企业。</p>
         <div id="companyResults" class="research-results"></div>
+      </section>
+
+      <section class="website-panel" aria-labelledby="website-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 04 · 官网证据</p>
+            <h2 id="website-title">从一张公开官网页面补证</h2>
+          </div>
+          <button id="exportWebsiteEvidence" class="button ghost" type="button" disabled>导出官网证据</button>
+        </div>
+
+        <form id="websiteResearchForm" class="website-form">
+          <label class="url-field">
+            <span>公开或已授权的公司网页</span>
+            <input id="websiteUrl" name="url" type="url" maxlength="2000" required placeholder="https://example.com/contact" />
+          </label>
+          <label class="consent-check">
+            <input id="websiteConfirmed" type="checkbox" required />
+            <span>我确认该页面公开可访问或已获授权</span>
+          </label>
+          <button id="searchWebsite" class="button primary" type="submit">读取这一页</button>
+        </form>
+        <p class="privacy-note">系统只读取你指定的一页，不登录、不遍历整站；拦截本机/内网地址、跨站跳转和超大页面。官网邮箱、电话、WhatsApp、地址及工厂描述全部先标为候选，公开不等于同意接收营销。</p>
+        <label class="target-picker">
+          <span>人工确认后保存到</span>
+          <select id="websiteTargetLead" disabled><option value="">请先导入询盘</option></select>
+        </label>
+        <p id="websiteStatus" class="status" role="status" aria-live="polite">尚未读取官网页面。</p>
+        <div id="websiteResults" class="research-results"></div>
       </section>
 
       <section class="relationship-panel" aria-labelledby="relationship-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 04 · 信任路径</p>
+            <p class="section-label">STEP 05 · 信任路径</p>
             <h2 id="relationship-title">谁适合帮你建立信任</h2>
           </div>
           <div class="toolbar">

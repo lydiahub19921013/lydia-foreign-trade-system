@@ -74,6 +74,47 @@ test("workbench server separates input errors from provider failures", async () 
   });
 });
 
+test("workbench server requires confirmation before reading one public website page", async () => {
+  const calls = [];
+  await withServer(async (origin) => {
+    const missingConsent = await fetch(`${origin}/api/website/snapshot?url=https%3A%2F%2Fexample.com`);
+    assert.equal(missingConsent.status, 400);
+    assert.match((await missingConsent.json()).error, /确认/);
+
+    const response = await fetch(`${origin}/api/website/snapshot?confirmed=true&url=https%3A%2F%2Fexample.com%2Fcontact`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).provider, "public-website");
+    assert.deepEqual(calls, ["https://example.com/contact"]);
+  }, {
+    websiteSnapshot: async (url) => {
+      calls.push(url);
+      return { provider: "public-website", finalUrl: url, evidence: [] };
+    }
+  });
+});
+
+test("workbench server does not expose website provider failures", async () => {
+  await withServer(async (origin) => {
+    const blocked = await fetch(`${origin}/api/website/snapshot?confirmed=true&url=http%3A%2F%2F127.0.0.1`);
+    assert.equal(blocked.status, 400);
+    assert.match((await blocked.json()).error, /内部网络/);
+  }, {
+    websiteSnapshot: async () => {
+      throw new Error("不能访问本机或内部网络地址");
+    }
+  });
+
+  await withServer(async (origin) => {
+    const failed = await fetch(`${origin}/api/website/snapshot?confirmed=true&url=https%3A%2F%2Fexample.com`);
+    assert.equal(failed.status, 502);
+    assert.deepEqual(await failed.json(), { error: "官网暂时无法读取，请检查网址或稍后重试。" });
+  }, {
+    websiteSnapshot: async () => {
+      throw new Error("private upstream stack trace");
+    }
+  });
+});
+
 test("workbench server rejects writes and path traversal", async () => {
   await withServer(async (origin) => {
     assert.equal((await fetch(origin, { method: "POST" })).status, 405);

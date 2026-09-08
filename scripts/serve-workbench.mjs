@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchGleifEntities } from "../integrations/gleif/client.mjs";
+import { fetchPublicWebsiteSnapshot } from "../integrations/public-website/snapshot.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entryPage = resolve(repositoryRoot, "apps/lead-workbench/index.html");
@@ -37,6 +38,7 @@ function writeJson(response, status, payload, method = "GET") {
 
 export function createWorkbenchServer(options = {}) {
   const gleifSearch = options.gleifSearch || searchGleifEntities;
+  const websiteSnapshot = options.websiteSnapshot || fetchPublicWebsiteSnapshot;
 
   return createServer(async (request, response) => {
     if (!["GET", "HEAD"].includes(request.method)) {
@@ -58,6 +60,23 @@ export function createWorkbenchServer(options = {}) {
         const inputError = /至少需要/.test(message);
         writeJson(response, inputError ? 400 : 502, {
           error: inputError ? message : "GLEIF 企业核验暂时失败，请稍后重试。"
+        }, request.method);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/website/snapshot") {
+      if (url.searchParams.get("confirmed") !== "true") {
+        writeJson(response, 400, { error: "请先确认该页面公开可访问或已获授权。" }, request.method);
+        return;
+      }
+      try {
+        writeJson(response, 200, await websiteSnapshot(url.searchParams.get("url") || ""), request.method);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "官网读取失败";
+        const inputError = /请输入|只支持|不能|公网地址|其他域名|超过 1 MB|网页文本|跳转次数/iu.test(message);
+        writeJson(response, inputError ? 400 : 502, {
+          error: inputError ? message : "官网暂时无法读取，请检查网址或稍后重试。"
         }, request.method);
       }
       return;
@@ -93,6 +112,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const server = createWorkbenchServer();
   server.listen(port, "127.0.0.1", () => {
     console.log(`Lydia 外贸工作台已启动：http://127.0.0.1:${port}`);
-    console.log("按 Ctrl+C 停止。客户文件只在浏览器页面中处理。");
+    console.log("按 Ctrl+C 停止。导入文件只在浏览器处理；只有主动查询功能会联网。");
   });
 }

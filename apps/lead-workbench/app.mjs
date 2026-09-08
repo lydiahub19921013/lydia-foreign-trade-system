@@ -1,6 +1,7 @@
 import {
   findDuplicateCandidates,
   leadsFromCsv,
+  mergeEvidenceIntoLead,
   normalizeLead,
   qualifyLead,
   rankIntroductionPaths,
@@ -11,6 +12,7 @@ import {
 const $ = (selector) => document.querySelector(selector);
 let currentResult = null;
 let currentCompanyResearch = null;
+let currentWebsiteResearch = null;
 let currentRelationshipResult = null;
 
 function updateStatus(selector, message, type = "neutral") {
@@ -51,6 +53,50 @@ function buildResult(leads, sourceFile) {
     duplicateCandidates: findDuplicateCandidates(leads),
     results: leads.map((lead) => ({ lead, qualification: qualifyLead(lead) }))
   };
+}
+
+function populateResearchLeadTargets() {
+  for (const selector of ["#companyTargetLead", "#websiteTargetLead"]) {
+    const select = $(selector);
+    const previous = select.value;
+    select.replaceChildren();
+    if (!currentResult?.results.length) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "请先导入询盘";
+      select.append(option);
+      select.disabled = true;
+      continue;
+    }
+    for (const { lead } of currentResult.results) {
+      const option = document.createElement("option");
+      option.value = lead.id;
+      option.textContent = lead.organization.name || lead.contact.name || lead.sourceReference || lead.id;
+      select.append(option);
+    }
+    select.disabled = false;
+    if ([...select.options].some((option) => option.value === previous)) select.value = previous;
+  }
+}
+
+function attachResearchEvidence(targetSelector, enrichment, statusSelector, sourceLabel) {
+  const targetId = $(targetSelector).value;
+  if (!currentResult || !targetId) {
+    updateStatus(statusSelector, "请先导入询盘并选择要关联的客户。", "error");
+    return;
+  }
+  let targetName = targetId;
+  currentResult.results = currentResult.results.map((item) => {
+    if (item.lead.id !== targetId) return item;
+    targetName = item.lead.organization.name || item.lead.contact.name || item.lead.id;
+    const lead = mergeEvidenceIntoLead(item.lead, enrichment);
+    return { lead, qualification: qualifyLead(lead) };
+  });
+  currentResult.generatedAt = new Date().toISOString();
+  currentResult.duplicateCandidates = findDuplicateCandidates(currentResult.results.map((item) => item.lead));
+  renderSummary();
+  renderLeads();
+  updateStatus(statusSelector, `${sourceLabel}已保存到「${targetName}」的询盘档案；原有人工字段不会被覆盖。`, "success");
 }
 
 function summaryCard(label, value, grade) {
@@ -171,6 +217,7 @@ function renderLeads() {
 
 function showResult(leads, sourceFile) {
   currentResult = buildResult(leads, sourceFile);
+  populateResearchLeadTargets();
   renderSummary();
   renderLeads();
   $("#dashboard").classList.remove("hidden");
@@ -248,7 +295,23 @@ function companyCard(company) {
   source.rel = "noreferrer";
   source.textContent = "查看 GLEIF 原始记录 ↗";
 
-  card.append(heading, facts, source, evidenceList({ evidence: company.evidence }));
+  const save = document.createElement("button");
+  save.className = "button ghost compact";
+  save.type = "button";
+  save.textContent = "确认匹配并加入询盘";
+  save.addEventListener("click", () => attachResearchEvidence("#companyTargetLead", {
+    organization: {
+      name: company.legalName,
+      address: company.legalAddress,
+      registrationId: company.registeredAs
+    },
+    evidence: company.evidence
+  }, "#companyStatus", "GLEIF 企业证据"));
+
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  actions.append(source, save);
+  card.append(heading, facts, actions, evidenceList({ evidence: company.evidence }));
   return card;
 }
 
@@ -297,6 +360,119 @@ async function searchCompany(event) {
     $("#companyResults").replaceChildren();
     $("#exportCompanyEvidence").disabled = true;
     updateStatus("#companyStatus", error.message || "企业核验失败，请稍后重试。", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function contactGroup(label, values) {
+  const group = document.createElement("div");
+  group.className = "contact-group";
+  const title = document.createElement("strong");
+  title.textContent = label;
+  const content = document.createElement("p");
+  content.textContent = values?.length ? values.join(" · ") : "这张页面未发现";
+  group.append(title, content);
+  return group;
+}
+
+function websiteCard(result) {
+  const card = document.createElement("article");
+  card.className = "company-card";
+  const heading = document.createElement("div");
+  heading.className = "company-heading";
+  const title = document.createElement("h3");
+  title.textContent = result.title || "公开官网页面";
+  const badge = document.createElement("span");
+  badge.className = "evidence-badge";
+  badge.textContent = "全部为候选证据";
+  heading.append(title, badge);
+
+  const contacts = document.createElement("div");
+  contacts.className = "contact-grid";
+  contacts.append(
+    contactGroup("公开邮箱", result.contacts?.emails),
+    contactGroup("公开电话", result.contacts?.phones),
+    contactGroup("公开 WhatsApp", result.contacts?.whatsapp)
+  );
+
+  const facts = document.createElement("dl");
+  facts.className = "fact-grid";
+  facts.append(
+    fact("公开地址", result.addresses?.join("；")),
+    fact("生产/工厂自述", result.factorySignals?.join("；")),
+    fact("观察时间", result.observedAt)
+  );
+
+  const source = document.createElement("a");
+  source.className = "source-link";
+  source.href = result.finalUrl;
+  source.target = "_blank";
+  source.rel = "noreferrer";
+  source.textContent = "打开来源页面 ↗";
+
+  const save = document.createElement("button");
+  save.className = "button ghost compact";
+  save.type = "button";
+  save.textContent = "人工确认并加入询盘";
+  save.addEventListener("click", () => attachResearchEvidence("#websiteTargetLead", {
+    organization: {
+      name: result.title,
+      website: result.finalUrl,
+      address: result.addresses?.[0],
+      factoryInfo: result.factorySignals?.[0]
+    },
+    contact: {
+      email: result.contacts?.emails?.[0],
+      phone: result.contacts?.phones?.[0],
+      whatsapp: result.contacts?.whatsapp?.[0]
+    },
+    evidence: result.evidence
+  }, "#websiteStatus", "官网候选证据"));
+
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  actions.append(source, save);
+  card.append(heading, contacts, facts, actions, evidenceList({ evidence: result.evidence }));
+  return card;
+}
+
+function renderWebsiteResearch() {
+  const container = $("#websiteResults");
+  container.replaceChildren(websiteCard(currentWebsiteResearch));
+}
+
+async function searchWebsite(event) {
+  event.preventDefault();
+  const websiteUrl = $("#websiteUrl").value.trim();
+  const confirmed = $("#websiteConfirmed").checked;
+  const button = $("#searchWebsite");
+  button.disabled = true;
+  updateStatus("#websiteStatus", "正在读取指定的公开官网页面……");
+  try {
+    const parameters = new URLSearchParams({ url: websiteUrl, confirmed: String(confirmed) });
+    const response = await fetch(`/api/website/snapshot?${parameters}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "官网读取失败");
+    currentWebsiteResearch = {
+      format: "lydia-public-website-evidence",
+      schemaVersion: 1,
+      product: "Lydia 外贸系统",
+      ...payload
+    };
+    renderWebsiteResearch();
+    $("#exportWebsiteEvidence").disabled = false;
+    const contacts = [
+      ...(payload.contacts?.emails || []),
+      ...(payload.contacts?.phones || []),
+      ...(payload.contacts?.whatsapp || [])
+    ].length;
+    updateStatus("#websiteStatus", `已读取 1 张页面，形成 ${payload.evidence.length} 条候选证据，其中 ${contacts} 条公开联系线索。请逐项人工核查。`, "success");
+  } catch (error) {
+    currentWebsiteResearch = null;
+    $("#websiteResults").replaceChildren();
+    $("#exportWebsiteEvidence").disabled = true;
+    updateStatus("#websiteStatus", error.message || "官网读取失败，请检查网址或稍后重试。", "error");
   } finally {
     button.disabled = false;
   }
@@ -408,6 +584,13 @@ $("#exportCompanyEvidence").addEventListener("click", () => {
   if (!currentCompanyResearch) return;
   downloadJson(currentCompanyResearch, `Lydia-企业核验-${new Date().toISOString().slice(0, 10)}.json`);
   updateStatus("#companyStatus", "企业核验证据已导出；使用前仍需人工确认是否为同一家公司。", "success");
+});
+
+$("#websiteResearchForm").addEventListener("submit", searchWebsite);
+$("#exportWebsiteEvidence").addEventListener("click", () => {
+  if (!currentWebsiteResearch) return;
+  downloadJson(currentWebsiteResearch, `Lydia-官网证据-${new Date().toISOString().slice(0, 10)}.json`);
+  updateStatus("#websiteStatus", "官网候选证据已导出；公开联系方式仍不等于营销同意。", "success");
 });
 
 $("#relationshipFile").addEventListener("change", (event) => loadRelationshipFile(event.target.files[0]));

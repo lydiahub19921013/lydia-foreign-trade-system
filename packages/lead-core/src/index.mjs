@@ -8,3 +8,4 @@ export {
   relationshipsFromJson
 } from "./relationship.mjs";
 export { findDuplicateCandidates } from "./deduplication.mjs";
+export { mergeEvidenceIntoLead } from "./enrichment.mjs";

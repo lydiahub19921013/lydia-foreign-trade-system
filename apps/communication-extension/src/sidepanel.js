@@ -5,6 +5,7 @@ import {
   addReplyHistory,
   createInitialState,
   exportPortableData,
+  importQualifiedLeads,
   importPortableData,
   migrateState,
   removeReplyHistory,
@@ -27,17 +28,41 @@ async function persistState() {
 }
 
 function readCustomerForm() {
+  const id = $("#customerId").value || crypto.randomUUID();
+  const existing = state.customers.find((customer) => customer.id === id);
   return {
-    id: $("#customerId").value || crypto.randomUUID(),
+    id,
     name: $("#customerName").value,
     company: $("#customerCompany").value,
     country: $("#customerCountry").value,
-    notes: $("#customerNotes").value
+    email: $("#customerEmail").value,
+    whatsapp: $("#customerWhatsapp").value,
+    notes: $("#customerNotes").value,
+    leadProfile: existing?.leadProfile || null
   };
 }
 
 function customerHasContent(customer) {
-  return Boolean(customer.name.trim() || customer.company.trim() || customer.country.trim() || customer.notes.trim());
+  return Boolean(customer.name.trim() || customer.company.trim() || customer.country.trim() || customer.email.trim() || customer.whatsapp.trim() || customer.notes.trim());
+}
+
+function renderLeadProfile(customer) {
+  const box = $("#leadSummary");
+  if (!customer?.leadProfile) {
+    box.classList.add("hidden");
+    box.replaceChildren();
+    return;
+  }
+
+  const profile = customer.leadProfile;
+  const heading = document.createElement("strong");
+  heading.textContent = `Lydia ${profile.grade} 级 · ${profile.score} 分`;
+  const meta = document.createElement("span");
+  meta.textContent = [profile.source, profile.product, profile.quantity].filter(Boolean).join(" · ") || "已导入分级资料";
+  const action = document.createElement("p");
+  action.textContent = profile.nextAction || "请先人工复核客户证据。";
+  box.replaceChildren(heading, meta, action);
+  box.classList.remove("hidden");
 }
 
 function clearCustomerForm() {
@@ -46,7 +71,10 @@ function clearCustomerForm() {
   $("#customerName").value = "";
   $("#customerCompany").value = "";
   $("#customerCountry").value = "";
+  $("#customerEmail").value = "";
+  $("#customerWhatsapp").value = "";
   $("#customerNotes").value = "";
+  renderLeadProfile(null);
 }
 
 function fillCustomerForm(customer) {
@@ -60,7 +88,15 @@ function fillCustomerForm(customer) {
   $("#customerName").value = customer.name;
   $("#customerCompany").value = customer.company;
   $("#customerCountry").value = customer.country;
+  $("#customerEmail").value = customer.email;
+  $("#customerWhatsapp").value = customer.whatsapp;
   $("#customerNotes").value = customer.notes;
+  renderLeadProfile(customer);
+
+  if (customer.leadProfile?.inquiryMessage && !$("#message").value.trim()) {
+    $("#message").value = customer.leadProfile.inquiryMessage;
+    renderScenario(detectScenario(customer.leadProfile.inquiryMessage));
+  }
 }
 
 function renderCustomers(selectedId = $("#customerId")?.value ?? "") {
@@ -68,7 +104,9 @@ function renderCustomers(selectedId = $("#customerId")?.value ?? "") {
   select.replaceChildren(new Option("未关联客户", ""));
 
   for (const customer of state.customers) {
-    const label = [customer.name, customer.company, customer.country].filter(Boolean).join(" · ") || "未命名客户";
+    const priority = customer.leadProfile ? `[${customer.leadProfile.grade} ${customer.leadProfile.score}]` : "";
+    const identity = [customer.name, customer.company, customer.country].filter(Boolean).join(" · ") || "未命名客户";
+    const label = [priority, identity].filter(Boolean).join(" ");
     select.add(new Option(label, customer.id));
   }
 
@@ -139,7 +177,8 @@ function renderHistory() {
 }
 
 function renderStats() {
-  $("#dataSummary").textContent = `${state.customers.length} 位客户 · ${state.replyHistory.length} 条回复`;
+  const qualified = state.customers.filter((customer) => customer.leadProfile).length;
+  $("#dataSummary").textContent = `${state.customers.length} 位客户 · ${qualified} 条分级 · ${state.replyHistory.length} 条回复`;
 }
 
 function fillSettings() {
@@ -334,6 +373,17 @@ async function importBackup(file) {
   setStatus("备份已导入。出于安全考虑，AI 功能保持关闭。", "success");
 }
 
+async function importQualification(file) {
+  const payload = JSON.parse(await file.text());
+  const imported = importQualifiedLeads(payload, state);
+  state = imported.state;
+  await persistState();
+  clearCustomerForm();
+  renderCustomers();
+  renderStats();
+  setStatus(`已导入 ${imported.importedCount} 位新客户，更新 ${imported.updatedCount} 位已有客户。请从客户列表选择后继续。`, "success");
+}
+
 function bindEvents() {
   $("#detect").addEventListener("click", () => {
     const message = $("#message").value.trim();
@@ -386,6 +436,18 @@ function bindEvents() {
       await importBackup(file);
     } catch (error) {
       setStatus(error.message || "备份导入失败。", "error");
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  $("#importQualified").addEventListener("change", async (event) => {
+    const [file] = event.target.files;
+    if (!file) return;
+    try {
+      await importQualification(file);
+    } catch (error) {
+      setStatus(error.message || "Lydia 分级结果导入失败。", "error");
     } finally {
       event.target.value = "";
     }

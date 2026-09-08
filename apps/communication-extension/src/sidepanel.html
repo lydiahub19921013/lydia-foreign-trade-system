@@ -13,7 +13,7 @@
         <h1>外贸开发插件</h1>
         <p class="subtitle">看懂客户来信，生成稳妥回复，留下可继续跟进的客户资料。</p>
       </div>
-      <span class="version">v0.1.0</span>
+      <span class="version">v0.2.0</span>
     </header>
 
     <main>
@@ -105,10 +105,21 @@
           国家或市场
           <input id="customerCountry" type="text" maxlength="80" placeholder="例如 Germany" />
         </label>
+        <div class="two-columns">
+          <label>
+            工作邮箱
+            <input id="customerEmail" type="email" maxlength="254" placeholder="name@company.com" />
+          </label>
+          <label>
+            WhatsApp
+            <input id="customerWhatsapp" type="tel" maxlength="80" placeholder="公开业务号码" />
+          </label>
+        </div>
         <label>
           跟进备注
           <textarea id="customerNotes" rows="3" maxlength="1000" placeholder="需求、偏好、下一步……"></textarea>
         </label>
+        <div id="leadSummary" class="lead-summary hidden"></div>
         <div class="actions right">
           <button id="saveCustomer" class="secondary" type="button">保存客户</button>
         </div>
@@ -179,6 +190,14 @@
           <small id="dataSummary">0 位客户 · 0 条回复</small>
         </summary>
         <div class="details-body">
+          <div class="import-box">
+            <strong>导入 Lydia 客户分级</strong>
+            <p class="privacy-note">先在 Lydia 外贸工作台完成询盘分级，再导入生成的 JSON。系统会保留你已经写过的人工备注。</p>
+            <label class="file-button">
+              选择分级 JSON
+              <input id="importQualified" type="file" accept="application/json,.json" />
+            </label>
+          </div>
           <p class="privacy-note">导出文件包含客户资料、回复历史和非敏感设置，但不会包含 API Key，AI 开关也会自动关闭。</p>
           <div class="actions">
             <button id="exportData" class="secondary" type="button">导出 JSON</button>

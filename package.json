@@ -9,7 +9,7 @@
   },
   "scripts": {
     "qualify": "node apps/inquiry-qualifier/cli.mjs",
-    "test": "node --test packages/lead-core/tests/*.test.mjs integrations/email-sleuth/*.test.mjs",
+    "test": "node --test packages/lead-core/tests/*.test.mjs integrations/*/*.test.mjs",
     "verify": "node scripts/verify-system.mjs",
     "check:core": "npm run test && npm run verify",
     "check:extension": "npm --prefix apps/communication-extension run check",

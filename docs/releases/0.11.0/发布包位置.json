@@ -1,0 +1,50 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.11.0",
+    "sourceCommit": "81a9631e5d8508a141abb62fd16a63c7285bd551",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "developmentTracking": {
+    "schemaVersion": 4,
+    "qualificationBaselineFrozen": true,
+    "appendOnlyActivities": true,
+    "reversibleActivityCorrections": true,
+    "followUpCompletionTracked": true,
+    "duplicateRecordsExcludedFromDenominator": true,
+    "automaticOutreachEnabled": false,
+    "browserPersistenceEnabled": false
+  },
+  "research": {
+    "atomicCrmCommit": "b1213e62ad06561c96222415ad789e0cbc2b6e43",
+    "krayinCrmCommit": "2c1209102a77969665b880af9dda730cf9748a04",
+    "licensesVerified": true,
+    "upstreamCodeCopied": false,
+    "customerDataSentToUpstreams": false
+  },
+  "verification": {
+    "systemTests": 106,
+    "extensionTests": 24,
+    "scannedTextFiles": 158,
+    "browserQaUsedFictionalDataOnly": true,
+    "browserDevelopmentFunnelVerified": true,
+    "browserFollowUpCompletionVerified": true,
+    "browserHoldGateVerified": true,
+    "browserVisualQaVerified": true,
+    "pluginSchema4ImportVerified": true,
+    "browserActivityVoidVerified": false,
+    "browserFilePickerReimportVerified": false
+  },
+  "verifiedAt": "2026-09-08T15:11:38+08:00"
+}

@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const EVIDENCE_STATUSES = new Set([
   "candidate",
@@ -9,6 +9,7 @@ const EVIDENCE_STATUSES = new Set([
 
 const REVIEW_ACTIONS = new Set(["accepted", "rejected", "revised"]);
 const REVIEW_DECISIONS = new Set(["accepted", "rejected"]);
+const DUPLICATE_REVIEW_DECISIONS = new Set(["same", "distinct", "reopened"]);
 const LEAD_FIELD_PATHS = new Set([
   "organization.name",
   "organization.domain",
@@ -135,6 +136,27 @@ function normalizeFieldOrigin(input = {}) {
   };
 }
 
+function normalizeDuplicateReview(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  const decision = DUPLICATE_REVIEW_DECISIONS.has(input.decision) ? input.decision : null;
+  const otherLeadId = boundedText(input.otherLeadId, 160);
+  const primaryLeadId = boundedText(input.primaryLeadId, 160) || null;
+  if (!decision || !otherLeadId || (decision === "same" && !primaryLeadId)) return null;
+  return {
+    pairId: boundedText(input.pairId, 380) || null,
+    otherLeadId,
+    decision,
+    primaryLeadId: decision === "same" ? primaryLeadId : null,
+    reviewedAt: isoDate(input.reviewedAt),
+    note: boundedText(input.note, 1000) || null,
+    confidence: boundedNumber(input.confidence, 0),
+    reasons: (Array.isArray(input.reasons) ? input.reasons : [])
+      .map((reason) => boundedText(reason, 240))
+      .filter(Boolean)
+      .slice(0, 20)
+  };
+}
+
 export function createEvidence(input = {}) {
   const status = EVIDENCE_STATUSES.has(input.status)
     ? input.status
@@ -212,6 +234,10 @@ export function normalizeLead(input = {}) {
       .map(normalizeFieldOrigin)
       .filter(Boolean)
       .slice(-200),
+    duplicateReviews: (Array.isArray(input.duplicateReviews) ? input.duplicateReviews : [])
+      .map(normalizeDuplicateReview)
+      .filter(Boolean)
+      .slice(-100),
     compliance: {
       doNotContact: bool(compliance.doNotContact),
       restrictedMarket: bool(compliance.restrictedMarket),

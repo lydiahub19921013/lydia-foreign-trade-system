@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  SCHEMA_VERSION,
   createEvidence,
   findDuplicateCandidates,
   mergeEvidenceIntoLead,
@@ -45,7 +46,7 @@ function enrichedLead() {
 
 test("enrichment records which evidence filled each empty field", () => {
   const lead = enrichedLead();
-  assert.equal(lead.schemaVersion, 2);
+  assert.equal(lead.schemaVersion, SCHEMA_VERSION);
   assert.deepEqual(lead.fieldOrigins.map((item) => [item.path, item.evidenceId]), [
     ["organization.website", "site-evidence"],
     ["contact.email", "email-evidence"]
@@ -126,7 +127,7 @@ test("export and reimport preserve field provenance and the complete review hist
     reviewedAt: "2026-09-08T03:00:00Z"
   });
   const roundTrip = normalizeLead(JSON.parse(JSON.stringify(restored.lead)));
-  assert.equal(roundTrip.schemaVersion, 2);
+  assert.equal(roundTrip.schemaVersion, SCHEMA_VERSION);
   assert.equal(roundTrip.organization.website, "https://northstar.example/about");
   assert.equal(roundTrip.fieldOrigins.find((item) => item.path === "organization.website").active, true);
   assert.deepEqual(roundTrip.evidence.find((item) => item.id === "site-evidence").review.history.map((item) => item.action), ["rejected", "accepted"]);

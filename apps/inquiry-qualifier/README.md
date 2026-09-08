@@ -14,3 +14,5 @@ npm run qualify -- ./询盘.csv --channel made-in-china --output ./分级结果.
 关键状态字段可使用 `candidate`、`inconclusive`、`verified`、`rejected`。例如只有当 `email_status=verified` 且保留 `source_reference` 时，邮箱才会按已验证证据计分。
 
 等级是开发优先级建议，不是信用评级、身份结论或成交承诺。
+
+命令行会输出待人工处理的 `duplicateCandidates`，并保留已经在工作台完成的 `duplicateDecisions`。重复提示不能代替法定主体核验；真正的主账户关系必须在工作台人工确认。

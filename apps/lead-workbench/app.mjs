@@ -8,6 +8,7 @@ import {
   findDuplicateCandidates,
   generateEmailCandidates,
   leadsFromCsv,
+  listDuplicateDecisions,
   mergeEvidenceIntoLead,
   normalizeLead,
   createProspectSearchPlan,
@@ -21,6 +22,7 @@ import {
   reviewLeadEvidence,
   relationshipsFromCsv,
   relationshipsFromJson,
+  reviewDuplicatePair,
   reviseLeadEvidence
 } from "/packages/lead-core/src/index.mjs";
 
@@ -35,6 +37,7 @@ let selectedWebsiteEvidenceIds = new Set();
 let currentEmailResearch = null;
 let currentRelationshipResult = null;
 let pendingEvidenceAction = null;
+let pendingDuplicateAction = null;
 
 function updateStatus(selector, message, type = "neutral") {
   const status = $(selector);
@@ -64,16 +67,31 @@ async function parseFile(file) {
 }
 
 function buildResult(leads, sourceFile) {
+  const normalizedLeads = leads.map(normalizeLead);
   return {
     format: "lydia-qualified-leads",
     schemaVersion: SCHEMA_VERSION,
     product: "Lydia 外贸系统",
     generatedAt: new Date().toISOString(),
     sourceFile,
-    count: leads.length,
-    duplicateCandidates: findDuplicateCandidates(leads),
-    results: leads.map((lead) => ({ lead, qualification: qualifyLead(lead) }))
+    count: normalizedLeads.length,
+    duplicateCandidates: findDuplicateCandidates(normalizedLeads),
+    duplicateDecisions: listDuplicateDecisions(normalizedLeads),
+    results: normalizedLeads.map((lead) => ({ lead, qualification: qualifyLead(lead) }))
   };
+}
+
+function leadDisplayName(leadId) {
+  const lead = currentResult?.results.find((item) => item.lead.id === leadId)?.lead;
+  return lead?.organization.name || lead?.contact.name || lead?.sourceReference || leadId;
+}
+
+function refreshLeadResult(leads) {
+  currentResult.results = leads.map((lead) => ({ lead, qualification: qualifyLead(lead) }));
+  currentResult.count = leads.length;
+  currentResult.generatedAt = new Date().toISOString();
+  currentResult.duplicateCandidates = findDuplicateCandidates(leads);
+  currentResult.duplicateDecisions = listDuplicateDecisions(leads);
 }
 
 function populateResearchLeadTargets() {
@@ -126,6 +144,7 @@ function attachResearchEvidence(targetSelector, enrichment, statusSelector, sour
   });
   currentResult.generatedAt = new Date().toISOString();
   currentResult.duplicateCandidates = findDuplicateCandidates(currentResult.results.map((item) => item.lead));
+  currentResult.duplicateDecisions = listDuplicateDecisions(currentResult.results.map((item) => item.lead));
   renderSummary();
   renderLeads();
   updateStatus(statusSelector, `${sourceLabel}已保存到「${targetName}」的询盘档案；原有人工字段不会被覆盖。`, "success");
@@ -155,10 +174,163 @@ function renderSummary() {
   const notice = $("#duplicateNotice");
   const strong = currentResult.duplicateCandidates.filter((item) => item.automaticHoldRecommended).length;
   if (currentResult.duplicateCandidates.length) {
-    notice.textContent = `发现 ${currentResult.duplicateCandidates.length} 组可能重复线索，其中 ${strong} 组由相同域名、登记号、渠道编号或已验证邮箱触发。系统不会自动合并，请人工确认。`;
+    notice.textContent = `还有 ${currentResult.duplicateCandidates.length} 组可能属于同一客户，其中 ${strong} 组由相同域名、登记号、渠道编号或已验证邮箱触发。系统不会自动删除或覆盖资料，请人工指定主账户。`;
+    notice.classList.remove("hidden");
+  } else if (currentResult.duplicateDecisions.length) {
+    notice.textContent = `重复客户候选已经处理完；${currentResult.duplicateDecisions.length} 组人工决定仍保留在下方，可随时重新判断。`;
     notice.classList.remove("hidden");
   } else {
     notice.classList.add("hidden");
+  }
+  renderDuplicateReviews();
+}
+
+function duplicatePairTitle(leadIds) {
+  return leadIds.map(leadDisplayName).join(" ↔ ");
+}
+
+function openDuplicateDialog(pair, decision) {
+  pendingDuplicateAction = { leadIds: pair.leadIds, decision };
+  const labels = {
+    same: ["确认为同一客户", "请选择一个主账户。另一条询盘只会被关联并暂停重复开发，原始内容不会被删除或覆盖。"],
+    distinct: ["确认不是同一客户", "这组提示会被关闭，但人工判断和原因会继续保留。"],
+    reopened: ["重新判断这组客户", "原来的人工决定会被撤销；如果重复证据仍然存在，这组候选会重新出现。"]
+  };
+  const [title, description] = labels[decision];
+  $("#duplicateDialogTitle").textContent = title;
+  $("#duplicateDialogDescription").textContent = `${duplicatePairTitle(pair.leadIds)}。${description}`;
+  const primaryField = $("#duplicatePrimaryField");
+  const primarySelect = $("#duplicatePrimaryLead");
+  primaryField.hidden = decision !== "same";
+  primarySelect.disabled = decision !== "same";
+  primarySelect.required = decision === "same";
+  primarySelect.replaceChildren();
+  if (decision === "same") {
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "请选择主账户";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    primarySelect.append(placeholder);
+    for (const leadId of pair.leadIds) {
+      const option = document.createElement("option");
+      option.value = leadId;
+      option.textContent = leadDisplayName(leadId);
+      primarySelect.append(option);
+    }
+  }
+  $("#duplicateReviewNote").value = "";
+  $("#duplicateDialogStatus").textContent = "";
+  $("#duplicateReviewSubmit").textContent = decision === "same" ? "确认主账户" : decision === "distinct" ? "确认不同客户" : "撤销原决定";
+  $("#duplicateReviewDialog").showModal();
+  (decision === "same" ? primarySelect : $("#duplicateReviewNote")).focus();
+}
+
+function duplicateCandidateCard(pair) {
+  const card = document.createElement("article");
+  card.className = "duplicate-review-card pending";
+  const body = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = duplicatePairTitle(pair.leadIds);
+  const reason = document.createElement("p");
+  reason.textContent = pair.reasons.join(" · ");
+  const confidence = document.createElement("small");
+  confidence.textContent = `匹配提示强度 ${Math.round(pair.confidence * 100)}% · 只表示需要人工核对`;
+  body.append(title, reason, confidence);
+  const actions = document.createElement("div");
+  actions.className = "duplicate-review-actions";
+  const same = document.createElement("button");
+  same.className = "button primary compact";
+  same.type = "button";
+  same.textContent = "确认为同一客户";
+  same.addEventListener("click", () => openDuplicateDialog(pair, "same"));
+  const distinct = document.createElement("button");
+  distinct.className = "button ghost compact";
+  distinct.type = "button";
+  distinct.textContent = "不是同一客户";
+  distinct.addEventListener("click", () => openDuplicateDialog(pair, "distinct"));
+  actions.append(same, distinct);
+  card.append(body, actions);
+  return card;
+}
+
+function duplicateDecisionCard(review) {
+  const card = document.createElement("article");
+  card.className = "duplicate-review-card resolved";
+  const body = document.createElement("div");
+  const title = document.createElement("strong");
+  title.textContent = duplicatePairTitle(review.leadIds);
+  const decision = document.createElement("p");
+  decision.textContent = review.decision === "same"
+    ? `已确认为同一客户 · 主账户：${leadDisplayName(review.primaryLeadId)}`
+    : "已确认不是同一客户";
+  const audit = document.createElement("small");
+  const time = review.reviewedAt ? new Date(review.reviewedAt).toLocaleString("zh-CN") : "时间未记录";
+  audit.textContent = `${time} · 原因：${review.note || "未填写"}`;
+  body.append(title, decision, audit);
+  const reopen = document.createElement("button");
+  reopen.className = "button ghost compact";
+  reopen.type = "button";
+  reopen.textContent = "重新判断";
+  reopen.addEventListener("click", () => openDuplicateDialog(review, "reopened"));
+  card.append(body, reopen);
+  return card;
+}
+
+function renderDuplicateReviews() {
+  const container = $("#duplicateReviewList");
+  container.replaceChildren();
+  const pending = currentResult?.duplicateCandidates || [];
+  const resolved = currentResult?.duplicateDecisions || [];
+  if (!pending.length && !resolved.length) {
+    container.classList.add("hidden");
+    return;
+  }
+  container.classList.remove("hidden");
+  if (pending.length) {
+    const heading = document.createElement("h3");
+    heading.textContent = "待确认的重复客户";
+    container.append(heading, ...pending.map(duplicateCandidateCard));
+  }
+  if (resolved.length) {
+    const details = document.createElement("details");
+    details.className = "duplicate-resolved";
+    const summary = document.createElement("summary");
+    summary.textContent = `已处理 ${resolved.length} 组（保留审计，可撤销）`;
+    const list = document.createElement("div");
+    list.className = "duplicate-resolved-list";
+    list.append(...resolved.map(duplicateDecisionCard));
+    details.append(summary, list);
+    container.append(details);
+  }
+}
+
+function applyDuplicateAction(event) {
+  event.preventDefault();
+  if (!pendingDuplicateAction || !currentResult) return;
+  try {
+    const result = reviewDuplicatePair(
+      currentResult.results.map((item) => item.lead),
+      pendingDuplicateAction.leadIds,
+      {
+        decision: pendingDuplicateAction.decision,
+        primaryLeadId: $("#duplicatePrimaryLead").value,
+        note: $("#duplicateReviewNote").value
+      }
+    );
+    refreshLeadResult(result.leads);
+    $("#duplicateReviewDialog").close();
+    const message = result.decision === "same"
+      ? `已建立主账户「${leadDisplayName(result.primaryLeadId)}」；另一条原始询盘仍完整保留。`
+      : result.decision === "distinct"
+        ? "已记录为不同客户，这组重复提示不再出现。"
+        : "原决定已撤销；若匹配证据仍存在，这组候选已回到待确认列表。";
+    pendingDuplicateAction = null;
+    renderSummary();
+    renderLeads();
+    updateStatus("#duplicateReviewStatus", message, "success");
+  } catch (error) {
+    updateStatus("#duplicateDialogStatus", error.message || "重复客户复核失败。", "error");
   }
 }
 
@@ -296,6 +468,7 @@ function applyEvidenceAction(event) {
       : candidate);
     currentResult.generatedAt = new Date().toISOString();
     currentResult.duplicateCandidates = findDuplicateCandidates(currentResult.results.map((candidate) => candidate.lead));
+    currentResult.duplicateDecisions = listDuplicateDecisions(currentResult.results.map((candidate) => candidate.lead));
     const message = evidenceActionMessage(pendingEvidenceAction.action, result);
     $("#evidenceReviewDialog").close();
     pendingEvidenceAction = null;
@@ -329,7 +502,14 @@ function leadCard(item) {
   const action = document.createElement("p");
   action.className = "lead-action";
   action.textContent = qualification.nextAction;
-  main.append(title, meta, contacts, action);
+  main.append(title, meta, contacts);
+  if (lead.compliance.duplicateOf) {
+    const master = document.createElement("p");
+    master.className = "duplicate-master";
+    master.textContent = `已归入主账户：${leadDisplayName(lead.compliance.duplicateOf)}；本条原始询盘保留。`;
+    main.append(master);
+  }
+  main.append(action);
 
   if (qualification.missingEvidence.length) {
     const missing = document.createElement("div");
@@ -1228,4 +1408,10 @@ $("#evidenceReviewForm").addEventListener("submit", applyEvidenceAction);
 $("#cancelEvidenceReview").addEventListener("click", () => {
   pendingEvidenceAction = null;
   $("#evidenceReviewDialog").close();
+});
+
+$("#duplicateReviewForm").addEventListener("submit", applyDuplicateAction);
+$("#cancelDuplicateReview").addEventListener("click", () => {
+  pendingDuplicateAction = null;
+  $("#duplicateReviewDialog").close();
 });

@@ -11,5 +11,8 @@ Lydia 外贸系统没有导入任何第三方客户数据、用户资料、密�
 | [Crawl4AI](https://github.com/unclecode/crawl4ai) | `862f6bccb9c063f49b9d42701baa0eea17a4993f` | Apache-2.0 | 作为未来可选官网提取提供方；当前没有捆绑其代码。启用时必须遵守其许可证及 NOTICE 要求。 |
 | [GLEIF LEI Data](https://www.gleif.org/en/lei-data/gleif-api) | 在线 Golden Copy | CC0 数据＋GLEIF访问条款 | 通过固定官方 API 查询企业身份；不使用其 Logo，不声称关联或背书，LEI 不作为信用保证。 |
 | [codex-first-customer-finder-skill](https://github.com/Kappaemme-git/codex-first-customer-finder-skill) | `943c455bdfc40da46265b01b3c1f41e4bb386f27` | MIT | 借鉴公开需求信号、原页核查、五维排序和“无来源不得入选”的研究纪律；用 Lydia 外贸字段和本地门禁重新实现。 |
+| [Dedupe](https://github.com/dedupeio/dedupe) | `3f61e79102910bd355e920a2df7e44c14c9cb247` | MIT | 研究记录匹配候选与人工标注分离；没有复制或捆绑其 Python 代码。 |
+| [Splink](https://github.com/moj-analytical-services/splink) | `1af8b6bb6dc3c3ee2842ae7a5b50d6e150a65143` | MIT | 研究多字段 blocking、比较与概率候选；当前没有引入其运行时或代码。 |
+| [GoldenMatch](https://github.com/benseverndev-oss/goldenmatch) | `4b8e0ae389415cd9f45e0aa6871b33c149ae44e2` | MIT | 借鉴稳定主实体、来源、追加式事件和可撤销 merge/split 原则；用 Lydia 数据结构独立实现，没有复制代码。 |
 
 MIT 许可证文本按相关项目保存在 `third_party/licenses/`。未复制代码时保留说明是为了让来源和判断过程可审查；如以后真正引入代码，必须再次核对上游版本和许可证。

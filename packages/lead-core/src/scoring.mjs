@@ -24,7 +24,7 @@ function holdReasons(lead) {
   const reasons = [];
   if (lead.compliance.doNotContact) reasons.push("客户已标记为不联系");
   if (lead.compliance.restrictedMarket) reasons.push("存在市场或合规限制");
-  if (lead.compliance.duplicateOf) reasons.push(`疑似重复客户：${lead.compliance.duplicateOf}`);
+  if (lead.compliance.duplicateOf) reasons.push(`已归入主账户：${lead.compliance.duplicateOf}`);
 
   const hasIdentity = Boolean(
     lead.organization.name ||

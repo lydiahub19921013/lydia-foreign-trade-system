@@ -14,7 +14,7 @@
 
 ## 字段来源
 
-Lead schema 2 使用 `fieldOrigins` 记录：
+Lead schema 3 延续 schema 2 引入的 `fieldOrigins`，记录：
 
 - 字段路径，例如 `contact.email`；
 - 对应 Evidence ID；

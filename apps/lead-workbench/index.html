@@ -85,6 +85,8 @@
         <div id="summary" class="summary-grid"></div>
 
         <div id="duplicateNotice" class="duplicate-notice hidden"></div>
+        <div id="duplicateReviewList" class="duplicate-review-list hidden"></div>
+        <p id="duplicateReviewStatus" class="status" role="status" aria-live="polite"></p>
         <p id="evidenceAuditStatus" class="status evidence-audit-status" role="status" aria-live="polite">可以展开客户证据，驳回、恢复或修订已入档内容。</p>
         <div id="leadList" class="lead-list"></div>
       </section>
@@ -280,6 +282,27 @@
         <div class="dialog-actions">
           <button id="cancelEvidenceReview" class="button ghost" type="button">取消</button>
           <button id="evidenceReviewSubmit" class="button primary" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="duplicateReviewDialog" class="evidence-dialog" aria-labelledby="duplicateDialogTitle">
+      <form id="duplicateReviewForm" method="dialog">
+        <p class="section-label">主账户复核</p>
+        <h2 id="duplicateDialogTitle">复核重复客户</h2>
+        <p id="duplicateDialogDescription" class="dialog-description"></p>
+        <label id="duplicatePrimaryField" class="dialog-note">
+          <span>保留哪个作为主账户</span>
+          <select id="duplicatePrimaryLead" required></select>
+        </label>
+        <label class="dialog-note">
+          <span>判断原因（至少 3 个字）</span>
+          <textarea id="duplicateReviewNote" minlength="3" maxlength="1000" rows="3" required></textarea>
+        </label>
+        <p id="duplicateDialogStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelDuplicateReview" class="button ghost" type="button">取消</button>
+          <button id="duplicateReviewSubmit" class="button primary" type="submit">保存</button>
         </div>
       </form>
     </dialog>

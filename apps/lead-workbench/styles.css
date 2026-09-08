@@ -83,6 +83,18 @@ input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-co
 .summary-card[data-grade="HOLD"] { background: #f5e6df; border-color: #e7c0b4; }
 
 .duplicate-notice { margin: 18px 0; border-left: 4px solid var(--amber); border-radius: 10px; background: #fff5dc; padding: 14px 16px; line-height: 1.55; }
+.duplicate-review-list { display: grid; gap: 9px; margin: 14px 0; }
+.duplicate-review-list > h3 { margin: 4px 0 2px; font-size: 15px; }
+.duplicate-review-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; border: 1px solid var(--line); border-radius: 13px; background: #fff; padding: 14px 16px; }
+.duplicate-review-card.pending { border-left: 4px solid var(--amber); }
+.duplicate-review-card.resolved { background: #f7f8f3; }
+.duplicate-review-card p { margin: 5px 0; line-height: 1.45; }
+.duplicate-review-card small { color: var(--muted); }
+.duplicate-review-actions { display: flex; gap: 7px; flex-wrap: wrap; justify-content: end; }
+.duplicate-resolved { margin-top: 5px; }
+.duplicate-resolved > summary { color: var(--forest); cursor: pointer; font-size: 13px; font-weight: 760; }
+.duplicate-resolved-list { display: grid; gap: 8px; margin-top: 9px; }
+.duplicate-master { width: fit-content; margin: 10px 0 0; border-radius: 999px; background: #f5e6df; padding: 6px 10px; color: #8d3529; font-size: 12px; font-weight: 720; }
 .lead-list { display: grid; gap: 12px; }
 .lead-card { display: grid; grid-template-columns: 72px 1fr auto; gap: 18px; align-items: start; border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px; }
 .grade { width: 58px; height: 58px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: var(--forest); font-family: Georgia, serif; font-size: 27px; }
@@ -232,6 +244,8 @@ footer { border-top: 1px solid var(--line); padding: 26px 20px 38px; color: var(
   .target-picker select { width: 100%; min-width: 0; }
   .summary-grid { grid-template-columns: repeat(3, 1fr); }
   .lead-card { grid-template-columns: 58px 1fr; }
+  .duplicate-review-card { grid-template-columns: 1fr; }
+  .duplicate-review-actions { justify-content: start; }
   .score { grid-column: 2; text-align: left; }
   .evidence-toggle { grid-column: 1 / -1; }
   .principle-grid { grid-template-columns: 1fr; }

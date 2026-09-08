@@ -2,7 +2,14 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
-import { SCHEMA_VERSION, findDuplicateCandidates, leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
+import {
+  SCHEMA_VERSION,
+  findDuplicateCandidates,
+  leadsFromCsv,
+  listDuplicateDecisions,
+  normalizeLead,
+  qualifyLead
+} from "../../packages/lead-core/src/index.mjs";
 
 function usage() {
   return "用法：npm run qualify -- <inquiries.csv|json> [--channel auto|alibaba|made-in-china] [--output result.json]";
@@ -56,6 +63,7 @@ if (args && !args.input) {
       sourceFile: basename(inputPath),
       count: leads.length,
       duplicateCandidates: findDuplicateCandidates(leads),
+      duplicateDecisions: listDuplicateDecisions(leads),
       results: leads.map((lead) => ({
         lead,
         qualification: qualifyLead(lead)

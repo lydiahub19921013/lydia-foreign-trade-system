@@ -7,7 +7,12 @@ export {
   relationshipsFromCsv,
   relationshipsFromJson
 } from "./relationship.mjs";
-export { findDuplicateCandidates } from "./deduplication.mjs";
+export {
+  duplicatePairId,
+  findDuplicateCandidates,
+  listDuplicateDecisions
+} from "./deduplication.mjs";
+export { reviewDuplicatePair } from "./duplicate-review.mjs";
 export { mergeEvidenceIntoLead } from "./enrichment.mjs";
 export { enrichmentFromEvidenceSelection } from "./evidence-selection.mjs";
 export { reviewLeadEvidence, reviseLeadEvidence } from "./evidence-review.mjs";

@@ -44,18 +44,67 @@ function fingerprints(input) {
   return { lead, values };
 }
 
+export function duplicatePairId(leftId, rightId) {
+  const ids = [String(leftId || "").trim(), String(rightId || "").trim()].sort();
+  if (!ids[0] || !ids[1] || ids[0] === ids[1]) throw new Error("重复候选必须包含两个不同的客户 ID");
+  return `duplicate:${ids.map(encodeURIComponent).join(":")}`;
+}
+
+export function latestDuplicateDecision(leftInput, rightInput) {
+  const left = normalizeLead(leftInput);
+  const right = normalizeLead(rightInput);
+  const pairId = duplicatePairId(left.id, right.id);
+  let latest = null;
+  let latestTime = -Infinity;
+  let sequence = 0;
+  let latestSequence = -1;
+
+  for (const [lead, other] of [[left, right], [right, left]]) {
+    for (const review of lead.duplicateReviews) {
+      sequence += 1;
+      const matches = review.otherLeadId === other.id
+        && (!review.pairId || review.pairId === pairId);
+      if (!matches) continue;
+      const timestamp = review.reviewedAt ? Date.parse(review.reviewedAt) : -Infinity;
+      if (timestamp > latestTime || (timestamp === latestTime && sequence > latestSequence)) {
+        latest = { ...review, pairId, leadIds: [left.id, right.id].sort() };
+        latestTime = timestamp;
+        latestSequence = sequence;
+      }
+    }
+  }
+  return latest;
+}
+
+function canonicalLeadId(leadId, leadsById) {
+  let current = leadId;
+  const seen = new Set();
+  while (leadsById.has(current) && !seen.has(current)) {
+    seen.add(current);
+    const next = leadsById.get(current).compliance.duplicateOf;
+    if (!next || !leadsById.has(next)) break;
+    current = next;
+  }
+  return current;
+}
+
 export function findDuplicateCandidates(inputs) {
+  const leads = inputs.map(normalizeLead);
+  const leadsById = new Map(leads.map((lead) => [lead.id, lead]));
   const index = new Map();
   const pairs = new Map();
 
-  for (const input of inputs) {
+  for (const input of leads) {
     const { lead, values } = fingerprints(input);
+    const canonicalId = canonicalLeadId(lead.id, leadsById);
     for (const fingerprint of values) {
       const previous = index.get(fingerprint.key) || [];
       for (const other of previous) {
-        const ids = [other.id, lead.id].sort();
-        const pairKey = ids.join("|");
+        if (other.canonicalId === canonicalId) continue;
+        const ids = [other.canonicalId, canonicalId].sort();
+        const pairKey = duplicatePairId(...ids);
         const current = pairs.get(pairKey) || {
+          pairId: pairKey,
           leadIds: ids,
           confidence: 0,
           automaticHoldRecommended: false,
@@ -66,10 +115,39 @@ export function findDuplicateCandidates(inputs) {
         if (!current.reasons.includes(fingerprint.reason)) current.reasons.push(fingerprint.reason);
         pairs.set(pairKey, current);
       }
-      previous.push(lead);
+      previous.push({ canonicalId, sourceLeadId: lead.id });
       index.set(fingerprint.key, previous);
     }
   }
 
-  return [...pairs.values()].sort((left, right) => right.confidence - left.confidence);
+  return [...pairs.values()]
+    .filter((pair) => {
+      const [left, right] = pair.leadIds.map((id) => leadsById.get(id));
+      if (!left || !right) return false;
+      const review = latestDuplicateDecision(left, right);
+      return !review || review.decision === "reopened";
+    })
+    .sort((left, right) => right.confidence - left.confidence);
+}
+
+export function listDuplicateDecisions(inputs) {
+  const leads = inputs.map(normalizeLead);
+  const leadsById = new Map(leads.map((lead) => [lead.id, lead]));
+  const reviewedPairs = new Map();
+
+  for (const lead of leads) {
+    for (const review of lead.duplicateReviews) {
+      if (!leadsById.has(review.otherLeadId) || review.otherLeadId === lead.id) continue;
+      const leadIds = [lead.id, review.otherLeadId].sort();
+      reviewedPairs.set(duplicatePairId(...leadIds), leadIds);
+    }
+  }
+
+  return [...reviewedPairs.values()]
+    .map((leadIds) => {
+      const [left, right] = leadIds.map((id) => leadsById.get(id));
+      return latestDuplicateDecision(left, right);
+    })
+    .filter((review) => review && review.decision !== "reopened")
+    .sort((left, right) => String(right.reviewedAt || "").localeCompare(String(left.reviewedAt || "")));
 }

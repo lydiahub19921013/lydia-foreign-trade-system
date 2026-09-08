@@ -31,6 +31,11 @@ import {
   summarizeDevelopment,
   voidDevelopmentEvent
 } from "/packages/lead-core/src/index.mjs";
+import {
+  PERSISTED_UI_FIELD_IDS,
+  createIndexedDbPersistence,
+  createWorkbenchSnapshot
+} from "./persistence.mjs";
 
 const $ = (selector) => document.querySelector(selector);
 let currentResult = null;
@@ -45,6 +50,14 @@ let currentRelationshipResult = null;
 let pendingEvidenceAction = null;
 let pendingDuplicateAction = null;
 let pendingDevelopmentLeadId = null;
+let workbenchPersistence = null;
+let persistenceReady = false;
+let persistenceBlocked = false;
+let persistenceDirtyBeforeReady = false;
+let persistenceRevision = 0;
+let persistedRevision = 0;
+let persistenceDrain = null;
+let restoringSnapshot = false;
 
 function updateStatus(selector, message, type = "neutral") {
   const status = $(selector);
@@ -54,6 +67,69 @@ function updateStatus(selector, message, type = "neutral") {
 
 function setStatus(message, type = "neutral") {
   updateStatus("#status", message, type);
+}
+
+function collectUiState() {
+  return Object.fromEntries(PERSISTED_UI_FIELD_IDS.map((id) => [id, $(`#${id}`)?.value || ""]));
+}
+
+function workbenchStateForPersistence() {
+  return {
+    currentResult,
+    currentProspectPlan,
+    currentProspectResult,
+    currentProspectForWebsite,
+    currentCompanyResearch,
+    currentWebsiteResearch,
+    selectedWebsiteEvidenceIds: [...selectedWebsiteEvidenceIds],
+    currentEmailResearch,
+    currentRelationshipResult,
+    ui: collectUiState()
+  };
+}
+
+function persistenceMessage(message, type = "neutral") {
+  updateStatus("#persistenceStatus", message, type);
+}
+
+async function drainPersistence() {
+  if (!persistenceReady || persistenceBlocked || !workbenchPersistence || restoringSnapshot) return;
+  while (persistedRevision < persistenceRevision) {
+    const revision = persistenceRevision;
+    const snapshot = createWorkbenchSnapshot(workbenchStateForPersistence());
+    try {
+      persistenceMessage("正在保存到这个浏览器……");
+      const saved = await workbenchPersistence.save(snapshot);
+      persistedRevision = revision;
+      const time = new Date(saved.savedAt).toLocaleString("zh-CN");
+      persistenceMessage(`已自动保存 · ${time} · 未上传`, "success");
+      $("#clearLocalData").disabled = false;
+    } catch {
+      persistenceBlocked = true;
+      persistenceMessage("自动保存失败。请立即导出 JSON 备份；修复或清除本机数据前，不会显示保存成功。", "error");
+      break;
+    }
+  }
+}
+
+function ensurePersistenceDrain() {
+  if (!persistenceReady || persistenceBlocked || persistenceDrain || restoringSnapshot) return;
+  if (!persistenceDrain) {
+    persistenceDrain = drainPersistence().finally(() => {
+      persistenceDrain = null;
+      if (persistedRevision < persistenceRevision && !persistenceBlocked) ensurePersistenceDrain();
+    });
+  }
+}
+
+function schedulePersistence() {
+  if (restoringSnapshot || persistenceBlocked) return;
+  persistenceRevision += 1;
+  if (!persistenceReady) {
+    persistenceDirtyBeforeReady = true;
+    return;
+  }
+  ensurePersistenceDrain();
 }
 
 function leadsFromJson(payload) {
@@ -92,6 +168,113 @@ function buildResult(leads, sourceFile) {
   };
 }
 
+function storedObject(value, format, arrayKey) {
+  if (!value || typeof value !== "object" || value.format !== format) return null;
+  if (arrayKey && !Array.isArray(value[arrayKey])) return null;
+  return value;
+}
+
+function restoreUiState(ui) {
+  if (!ui || typeof ui !== "object") return;
+  for (const id of PERSISTED_UI_FIELD_IDS) {
+    const field = $(`#${id}`);
+    if (!field || typeof ui[id] !== "string") continue;
+    const limit = Number(field.maxLength);
+    const value = limit > 0 ? ui[id].slice(0, limit) : ui[id];
+    if (field instanceof HTMLSelectElement) {
+      if ([...field.options].some((option) => option.value === value)) field.value = value;
+    } else {
+      field.value = value;
+    }
+  }
+  $("#prospectSearchConfirmed").checked = false;
+  $("#websiteConfirmed").checked = false;
+}
+
+function restoreWorkbenchSnapshot(snapshot) {
+  restoringSnapshot = true;
+  try {
+    const stored = snapshot.state;
+    const storedResult = storedObject(stored.currentResult, "lydia-qualified-leads", "results");
+    if (storedResult) {
+      const leads = leadsFromJson(storedResult);
+      if (leads.length) currentResult = buildResult(leads, storedResult.sourceFile || "本机自动恢复");
+    }
+    currentProspectPlan = stored.currentProspectPlan?.queries?.length ? stored.currentProspectPlan : null;
+    currentProspectResult = storedObject(stored.currentProspectResult, "lydia-public-prospects", "prospects");
+    currentProspectForWebsite = stored.currentProspectForWebsite?.sourceUrl ? stored.currentProspectForWebsite : null;
+    currentCompanyResearch = storedObject(stored.currentCompanyResearch, "lydia-company-evidence", "results");
+    currentWebsiteResearch = ["lydia-public-website-evidence", "lydia-public-website-dossier"].includes(stored.currentWebsiteResearch?.format)
+      && Array.isArray(stored.currentWebsiteResearch?.evidence)
+      ? stored.currentWebsiteResearch
+      : null;
+    const validWebsiteEvidenceIds = new Set((currentWebsiteResearch?.evidence || []).map((item) => item.id));
+    selectedWebsiteEvidenceIds = new Set(
+      (Array.isArray(stored.selectedWebsiteEvidenceIds) ? stored.selectedWebsiteEvidenceIds : [])
+        .filter((id) => typeof id === "string" && validWebsiteEvidenceIds.has(id))
+    );
+    currentEmailResearch = storedObject(stored.currentEmailResearch, "lydia-email-candidates", "candidates");
+    currentRelationshipResult = storedObject(stored.currentRelationshipResult, "lydia-relationship-paths", "paths");
+
+    if (currentResult) populateResearchLeadTargets();
+    restoreUiState(stored.ui);
+
+    if (currentResult) {
+      renderSummary();
+      renderLeads();
+      $("#dashboard").classList.remove("hidden");
+      setStatus(`已从这个浏览器恢复 ${currentResult.count} 条询盘和开发记录。`, "success");
+    }
+    if (currentProspectPlan) renderProspectPlan(currentProspectPlan);
+    if (currentProspectResult) renderProspectResults();
+    if (currentCompanyResearch) {
+      renderCompanyResearch();
+      $("#exportCompanyEvidence").disabled = false;
+      updateStatus("#companyStatus", `已恢复 ${currentCompanyResearch.results.length} 条企业核验候选。请继续人工确认。`, "success");
+    }
+    if (currentWebsiteResearch) {
+      renderWebsiteResearch();
+      $("#exportWebsiteEvidence").disabled = false;
+      updateStatus("#websiteStatus", `已恢复 ${currentWebsiteResearch.evidence.length} 条官网候选证据。公开信息仍需人工确认。`, "success");
+    }
+    if (currentEmailResearch) {
+      renderEmailCandidates();
+      $("#exportEmailCandidates").disabled = false;
+      updateStatus("#emailStatus", `已恢复 ${currentEmailResearch.candidates.length} 个候选邮箱；它们仍不是已验证联系人。`, "success");
+    }
+    if (currentRelationshipResult) renderRelationshipResults();
+  } finally {
+    restoringSnapshot = false;
+  }
+}
+
+async function initializePersistence() {
+  try {
+    workbenchPersistence = createIndexedDbPersistence(window.indexedDB);
+    const snapshot = await workbenchPersistence.load();
+    if (snapshot && !persistenceDirtyBeforeReady) restoreWorkbenchSnapshot(snapshot);
+    persistenceReady = true;
+    if (snapshot) {
+      $("#clearLocalData").disabled = false;
+      if (!currentResult && !currentProspectResult && !currentRelationshipResult) {
+        persistenceMessage(`已读取本机快照 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")}`, "success");
+      } else {
+        persistenceMessage(`已自动恢复 · ${new Date(snapshot.savedAt).toLocaleString("zh-CN")} · 未上传`, "success");
+      }
+    } else {
+      persistenceMessage("自动保存已开启 · 尚无本机数据 · 未上传", "success");
+    }
+    if (persistenceDirtyBeforeReady) schedulePersistence();
+  } catch (error) {
+    persistenceBlocked = true;
+    $("#clearLocalData").disabled = !workbenchPersistence;
+    const recovery = workbenchPersistence
+      ? "请先导出已有数据；可用“清除本机数据”重新开始。"
+      : "请继续使用 JSON 导出备份，不要把当前页面当作已经自动保存。";
+    persistenceMessage(`${error.message || "无法读取本机数据"}。${recovery}`, "error");
+  }
+}
+
 function leadDisplayName(leadId) {
   const lead = currentResult?.results.find((item) => item.lead.id === leadId)?.lead;
   return lead?.organization.name || lead?.contact.name || lead?.sourceReference || leadId;
@@ -106,6 +289,7 @@ function refreshLeadResult(leads) {
   currentResult.duplicateCandidates = findDuplicateCandidates(trackedLeads);
   currentResult.duplicateDecisions = listDuplicateDecisions(trackedLeads);
   currentResult.developmentSummary = summarizeDevelopment(trackedLeads, { now: generatedAt });
+  schedulePersistence();
 }
 
 function populateResearchLeadTargets() {
@@ -162,6 +346,7 @@ function attachResearchEvidence(targetSelector, enrichment, statusSelector, sour
   renderSummary();
   renderLeads();
   updateStatus(statusSelector, `${sourceLabel}已保存到「${targetName}」的询盘档案；原有人工字段不会被覆盖。`, "success");
+  schedulePersistence();
 }
 
 function summaryCard(label, value, grade) {
@@ -567,6 +752,7 @@ function applyEvidenceAction(event) {
     currentResult.generatedAt = new Date().toISOString();
     currentResult.duplicateCandidates = findDuplicateCandidates(currentResult.results.map((candidate) => candidate.lead));
     currentResult.duplicateDecisions = listDuplicateDecisions(currentResult.results.map((candidate) => candidate.lead));
+    schedulePersistence();
     const message = evidenceActionMessage(pendingEvidenceAction.action, result);
     $("#evidenceReviewDialog").close();
     pendingEvidenceAction = null;
@@ -862,6 +1048,7 @@ function showResult(leads, sourceFile) {
   $("#dashboard").classList.remove("hidden");
   setStatus(`已在本机完成 ${leads.length} 条询盘分级。请人工复核来源和高优先级客户。`, "success");
   $("#dashboard").scrollIntoView({ behavior: "smooth", block: "start" });
+  schedulePersistence();
 }
 
 async function loadSelectedFile(file) {
@@ -885,6 +1072,7 @@ function downloadResult() {
   );
   downloadJson(currentResult, `Lydia-客户分级-${new Date().toISOString().slice(0, 10)}.json`);
   setStatus("Lydia 分级结果已导出，可在外贸开发插件中导入。", "success");
+  schedulePersistence();
 }
 
 function downloadJson(payload, filename) {
@@ -960,6 +1148,7 @@ function prospectCard(prospect) {
     $("#websiteConfirmed").checked = false;
     updateStatus("#websiteStatus", "已带入候选来源。请确认它是否为企业原始公开页面；若是目录或社媒页，请改填该企业官网。", "neutral");
     $("#website-title").scrollIntoView({ behavior: "smooth", block: "start" });
+    schedulePersistence();
   });
 
   const actions = document.createElement("div");
@@ -984,6 +1173,12 @@ function showProspectResults(prospects, source, provider = "local-import") {
     prospects: ranked,
     disclaimer: "搜索摘要和导入候选都不是已核实事实；必须回到原始公开页面核查。"
   };
+  renderProspectResults();
+  schedulePersistence();
+}
+
+function renderProspectResults() {
+  const ranked = currentProspectResult.prospects;
   const container = $("#prospectResults");
   container.replaceChildren();
   if (ranked.length) container.append(...ranked.map(prospectCard));
@@ -1030,6 +1225,7 @@ function buildProspectPlan(event) {
     });
     renderProspectPlan(currentProspectPlan);
     updateStatus("#prospectStatus", "已生成 5 个搜索方向。勾选公开信息确认后，选择一个方向搜索。", "success");
+    schedulePersistence();
   } catch (error) {
     updateStatus("#prospectStatus", error.message || "无法生成搜索计划。", "error");
   }
@@ -1091,6 +1287,7 @@ function addProspectToDevelopmentQueue(websiteResearch) {
     renderLeads();
     $("#dashboard").classList.remove("hidden");
     updateStatus("#websiteStatus", `已把「${lead.organization.name || "公开候选"}」加入开发队列；它不是主动询盘，仍需补需求和联系人证据。`, "success");
+    schedulePersistence();
   } catch (error) {
     updateStatus("#websiteStatus", error.message || "无法加入开发队列。", "error");
   }
@@ -1197,11 +1394,13 @@ async function searchCompany(event) {
       shown ? `找到 ${payload.total} 条可能记录，当前展示 ${shown} 条。请按法定名称、辖区和地址人工确认。` : "未找到 LEI 记录，请继续使用其他官方来源核查。",
       shown ? "success" : "neutral"
     );
+    schedulePersistence();
   } catch (error) {
     currentCompanyResearch = null;
     $("#companyResults").replaceChildren();
     $("#exportCompanyEvidence").disabled = true;
     updateStatus("#companyStatus", error.message || "企业核验失败，请稍后重试。", "error");
+    schedulePersistence();
   } finally {
     button.disabled = false;
   }
@@ -1240,8 +1439,8 @@ function dossierPages(result) {
   return details;
 }
 
-function updateWebsiteSelectionActions() {
-  if (currentWebsiteResearch) {
+function updateWebsiteSelectionActions(recordReview = false) {
+  if (currentWebsiteResearch && recordReview) {
     currentWebsiteResearch.reviewedEvidenceIds = [...selectedWebsiteEvidenceIds];
     currentWebsiteResearch.reviewedAt = new Date().toISOString();
   }
@@ -1250,6 +1449,7 @@ function updateWebsiteSelectionActions() {
   }
   const count = $("#websiteSelectionCount");
   if (count) count.textContent = `已选择 ${selectedWebsiteEvidenceIds.size} 条；未选择的内容不会进入客户档案。`;
+  if (recordReview) schedulePersistence();
 }
 
 function reviewableEvidenceList(result) {
@@ -1273,7 +1473,7 @@ function reviewableEvidenceList(result) {
     checkbox.addEventListener("change", () => {
       if (checkbox.checked) selectedWebsiteEvidenceIds.add(evidence.id);
       else selectedWebsiteEvidenceIds.delete(evidence.id);
-      updateWebsiteSelectionActions();
+      updateWebsiteSelectionActions(true);
     });
     const body = document.createElement("span");
     const title = document.createElement("strong");
@@ -1424,11 +1624,13 @@ async function searchWebsite(event) {
     const pages = payload.pageCount || 1;
     const failureText = payload.failures?.length ? `，另有 ${payload.failures.length} 张候选页面未能读取` : "";
     updateStatus("#websiteStatus", `已读取 ${pages} 张页面，形成 ${payload.evidence.length} 条候选证据，其中 ${contacts} 条公开联系线索${failureText}。请逐项人工核查。`, "success");
+    schedulePersistence();
   } catch (error) {
     currentWebsiteResearch = null;
     $("#websiteResults").replaceChildren();
     $("#exportWebsiteEvidence").disabled = true;
     updateStatus("#websiteStatus", error.message || "官网读取失败，请检查网址或稍后重试。", "error");
+    schedulePersistence();
   } finally {
     for (const button of buttons) button.disabled = false;
   }
@@ -1545,11 +1747,13 @@ async function generateAndCheckEmailCandidates(event) {
     const publishedCount = candidates.filter((candidate) => candidate.listedOnWebsite).length;
     const routeText = mailDomain.status === "mx-found" ? "域名存在 MX" : mailDomain.status === "no-mail-route" ? "域名没有邮件路由" : "域名邮件路由仍不确定";
     updateStatus("#emailStatus", `生成 ${candidates.length} 个候选；${routeText}；${publishedCount} 个被当前官网页面公开列出。具体邮箱仍未验证。`, mailDomain.status === "no-mail-route" ? "error" : "success");
+    schedulePersistence();
   } catch (error) {
     currentEmailResearch = null;
     $("#emailResults").replaceChildren();
     $("#exportEmailCandidates").disabled = true;
     updateStatus("#emailStatus", error.message || "候选邮箱生成失败。", "error");
+    schedulePersistence();
   } finally {
     button.disabled = false;
   }
@@ -1601,6 +1805,12 @@ function showRelationshipPaths(paths, sourceFile) {
     excludedDeclinedCount: paths.filter((path) => path.consentStatus === "declined").length,
     paths: ranked
   };
+  renderRelationshipResults();
+  schedulePersistence();
+}
+
+function renderRelationshipResults() {
+  const ranked = currentRelationshipResult.paths;
   const container = $("#relationshipResults");
   container.replaceChildren();
   if (ranked.length) container.append(...ranked.map(relationshipCard));
@@ -1611,7 +1821,7 @@ function showRelationshipPaths(paths, sourceFile) {
     container.append(empty);
   }
   $("#exportRelationshipPaths").disabled = false;
-  updateStatus("#relationshipStatus", `已在本机评估 ${paths.length} 条关系记录，排除 ${currentRelationshipResult.excludedDeclinedCount} 条拒绝路径。`, "success");
+  updateStatus("#relationshipStatus", `已在本机评估 ${currentRelationshipResult.inputCount ?? ranked.length} 条关系记录，排除 ${currentRelationshipResult.excludedDeclinedCount || 0} 条拒绝路径。`, "success");
 }
 
 async function loadRelationshipFile(file) {
@@ -1626,6 +1836,7 @@ async function loadRelationshipFile(file) {
     $("#relationshipResults").replaceChildren();
     $("#exportRelationshipPaths").disabled = true;
     updateStatus("#relationshipStatus", error.message || "关系文件导入失败。", "error");
+    schedulePersistence();
   }
 }
 
@@ -1647,8 +1858,14 @@ $("#exportProspects").addEventListener("click", () => {
 });
 
 $("#leadFile").addEventListener("change", (event) => loadSelectedFile(event.target.files[0]));
-$("#gradeFilter").addEventListener("change", renderLeads);
-$("#developmentFilter").addEventListener("change", renderLeads);
+$("#gradeFilter").addEventListener("change", () => {
+  renderLeads();
+  schedulePersistence();
+});
+$("#developmentFilter").addEventListener("change", () => {
+  renderLeads();
+  schedulePersistence();
+});
 $("#exportResults").addEventListener("click", downloadResult);
 $("#loadSample").addEventListener("click", async () => {
   try {
@@ -1729,3 +1946,31 @@ $("#cancelDevelopment").addEventListener("click", () => {
   pendingDevelopmentLeadId = null;
   $("#developmentDialog").close();
 });
+
+for (const id of PERSISTED_UI_FIELD_IDS.filter((field) => !["gradeFilter", "developmentFilter"].includes(field))) {
+  $(`#${id}`).addEventListener("change", schedulePersistence);
+}
+
+$("#clearLocalData").addEventListener("click", () => {
+  $("#clearLocalDataStatus").textContent = "";
+  $("#clearLocalDataDialog").showModal();
+});
+$("#cancelClearLocalData").addEventListener("click", () => $("#clearLocalDataDialog").close());
+$("#clearLocalDataForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#confirmClearLocalData");
+  button.disabled = true;
+  updateStatus("#clearLocalDataStatus", "正在清除这个浏览器中的 Lydia 工作台数据……");
+  try {
+    persistenceBlocked = true;
+    if (persistenceDrain) await persistenceDrain;
+    await workbenchPersistence.clear();
+    updateStatus("#clearLocalDataStatus", "本机工作台数据已清除，正在重新载入……", "success");
+    window.location.reload();
+  } catch {
+    updateStatus("#clearLocalDataStatus", "清除失败。已导出的 JSON 不受影响；请关闭其他 Lydia 工作台页面后重试。", "error");
+    button.disabled = false;
+  }
+});
+
+void initializePersistence();

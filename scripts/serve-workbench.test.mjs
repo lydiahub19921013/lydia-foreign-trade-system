@@ -21,6 +21,7 @@ test("workbench server serves the local UI and browser-safe core", async () => {
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /Lydia 外贸系统/);
+    assert.match(html, /本机自动保存/);
     assert.match(html, /\/apps\/lead-workbench\/app\.mjs/);
 
     const stylesheet = await fetch(`${origin}/apps/lead-workbench/styles.css`);
@@ -30,6 +31,10 @@ test("workbench server serves the local UI and browser-safe core", async () => {
     const core = await fetch(`${origin}/packages/lead-core/src/index.mjs`);
     assert.equal(core.status, 200);
     assert.match(core.headers.get("content-type"), /javascript/);
+
+    const persistence = await fetch(`${origin}/apps/lead-workbench/persistence.mjs`);
+    assert.equal(persistence.status, 200);
+    assert.match(await persistence.text(), /lydia-workbench-snapshot/);
   });
 });
 

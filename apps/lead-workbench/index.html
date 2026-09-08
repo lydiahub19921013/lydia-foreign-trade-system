@@ -14,7 +14,7 @@
           <span class="brand-mark">L</span>
           <span>Lydia 外贸系统</span>
         </a>
-        <span class="local-badge">本地运行 · 不自动上传</span>
+        <span class="local-badge">本机保存 · 不自动上传</span>
       </nav>
 
       <div id="top" class="hero-grid">
@@ -55,9 +55,17 @@
           <input id="leadFile" type="file" accept=".csv,.json,text/csv,application/json" />
           <span class="drop-icon">↗</span>
           <strong>选择 CSV 或 JSON 文件</strong>
-          <small>文件只在当前浏览器页面处理，不会由本工作台上传。</small>
+          <small>文件只在本机浏览器处理并自动保存，不会由本工作台上传。</small>
         </label>
         <p id="status" class="status" role="status" aria-live="polite">尚未导入数据。</p>
+        <div class="local-storage-panel" aria-labelledby="local-storage-title">
+          <div>
+            <strong id="local-storage-title"><span class="storage-dot" aria-hidden="true"></span>本机自动保存</strong>
+            <p id="persistenceStatus" class="status" role="status" aria-live="polite">正在检查这个浏览器的本机存储……</p>
+            <small>客户、开发活动和研究结果保存在这个浏览器的资料中，不会由工作台上传；本机数据未加密，同一电脑账户可能读取，请定期导出 JSON 备份。</small>
+          </div>
+          <button id="clearLocalData" class="button ghost compact" type="button" disabled>清除本机数据</button>
+        </div>
       </section>
 
       <section id="dashboard" class="dashboard hidden" aria-labelledby="result-title">
@@ -160,9 +168,9 @@
         <label class="compact-drop-zone prospect-import" for="prospectFile">
           <input id="prospectFile" type="file" accept=".csv,.json,text/csv,application/json" />
           <strong>也可以导入 Lydia 候选 CSV / JSON</strong>
-          <small>文件只在当前浏览器处理。没有原始来源链接或未核查原页的候选，最高只能得到 49 分。</small>
+          <small>文件只在本机浏览器处理并自动保存。没有原始来源链接或未核查原页的候选，最高只能得到 49 分。</small>
         </label>
-        <p class="privacy-note">搜索标题和摘要只能帮你发现候选，不能证明对方有采购需求。点击“送去官网补证”后，仍要核查原始公司页面；系统不会自动保存搜索结果、抓私人资料或发送消息。</p>
+        <p class="privacy-note">搜索标题和摘要只能帮你发现候选，不能证明对方有采购需求。点击“送去官网补证”后，仍要核查原始公司页面；当前结果会在这个浏览器中自动保存，但不会自动上传、抓私人资料或发送消息。</p>
         <p id="prospectStatus" class="status" role="status" aria-live="polite">先填写产品和市场，生成 5 个有目的的搜索方向。</p>
         <div id="prospectResults" class="prospect-results"></div>
       </section>
@@ -272,7 +280,7 @@
         <label class="compact-drop-zone" for="relationshipFile">
           <input id="relationshipFile" type="file" accept=".csv,.json,text/csv,application/json" />
           <strong>选择自有通讯录 / CRM 关系 CSV 或 JSON</strong>
-          <small>关系文件只在当前浏览器处理。已拒绝参与的人会被排除；公开的同公司、同校信息不等于认识或愿意背书。</small>
+          <small>关系文件只在本机浏览器处理并自动保存。已拒绝参与的人会被排除；公开的同公司、同校信息不等于认识或愿意背书。</small>
         </label>
         <p id="relationshipStatus" class="status" role="status" aria-live="polite">尚未导入关系记录。</p>
         <div id="relationshipResults" class="relationship-results"></div>
@@ -413,6 +421,19 @@
         <div class="dialog-actions">
           <button id="cancelDevelopment" class="button ghost" type="button">取消</button>
           <button class="button primary" type="submit">保存开发记录</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="clearLocalDataDialog" class="evidence-dialog" aria-labelledby="clearLocalDataTitle">
+      <form id="clearLocalDataForm" method="dialog">
+        <p class="section-label">本机数据管理</p>
+        <h2 id="clearLocalDataTitle">清除这个浏览器中的工作台数据？</h2>
+        <p class="dialog-description">这会删除自动保存的客户、开发活动、研究结果和当前界面状态。已经导出的 JSON、外贸开发插件数据和 GitHub 仓库不会受影响。</p>
+        <p id="clearLocalDataStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelClearLocalData" class="button ghost" type="button">取消</button>
+          <button id="confirmClearLocalData" class="button danger" type="submit">确认清除本机数据</button>
         </div>
       </form>
     </dialog>

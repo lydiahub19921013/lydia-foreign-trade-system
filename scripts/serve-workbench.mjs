@@ -170,6 +170,6 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const server = createWorkbenchServer();
   server.listen(port, "127.0.0.1", () => {
     console.log(`Lydia 外贸工作台已启动：http://127.0.0.1:${port}`);
-    console.log("按 Ctrl+C 停止。导入文件只在浏览器处理；只有主动查询功能会联网。");
+    console.log("按 Ctrl+C 停止。导入结果保存在本机浏览器；只有主动查询功能会联网。");
   });
 }

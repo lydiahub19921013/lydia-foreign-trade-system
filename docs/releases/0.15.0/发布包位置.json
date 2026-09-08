@@ -1,0 +1,51 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.15.0",
+    "sourceCommit": "ecddea7b4ecff4cb806b3a208c538368742b9153",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "csvImport": {
+    "reviewFormat": "lydia-csv-import-review",
+    "reviewSchemaVersion": 1,
+    "auditFormat": "lydia-csv-import-audit",
+    "auditSchemaVersion": 1,
+    "maxBytes": 26214400,
+    "confirmBeforeWorkspaceWrite": true,
+    "manualFieldMappingEnabled": true,
+    "ignoredColumnEnabled": true,
+    "auditPersistsWithWorkspace": true,
+    "auditStoresPreviewSamples": false,
+    "auditStoresIgnoredColumnValues": false,
+    "xlsxSupported": false,
+    "cliInteractiveReviewEnabled": false
+  },
+  "verification": {
+    "systemTests": 123,
+    "extensionTests": 24,
+    "scannedTextFiles": 180,
+    "browserVirtualSampleReviewVerified": true,
+    "browserMappingChangeVerified": true,
+    "browserCancelLeavesWorkspaceUnchanged": true,
+    "browserConfirmImportVerified": true,
+    "browserAuditPersistenceVerified": true,
+    "browserVisualQaVerified": true,
+    "browserRealChannelFileUploadVerified": false,
+    "realAlibabaFieldCompatibilityVerified": false,
+    "realMadeInChinaFieldCompatibilityVerified": false,
+    "browserQaUsedFictionalDataOnly": true,
+    "realCustomerDataUsed": false
+  },
+  "verifiedAt": "2026-09-08T17:26:26+08:00"
+}

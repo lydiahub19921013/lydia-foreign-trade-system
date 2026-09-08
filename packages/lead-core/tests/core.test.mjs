@@ -109,3 +109,16 @@ test("duplicate detection distinguishes strong domain matches from weak name mat
   assert.equal(duplicates[0].automaticHoldRecommended, true);
   assert.ok(duplicates[0].reasons.includes("相同企业域名"));
 });
+
+test("common Chinese inquiry headers map into the Lydia model", () => {
+  const [lead] = leadsFromCsv(
+    "询盘编号,公司名称,买家姓名,国家/地区,询盘内容,产品名称,采购数量,工作邮箱\nDEMO-CN-01,虚构采购公司,林样例,示例国,请报价,收纳盒,500,buyer@example.com\n",
+    { channel: "alibaba" }
+  );
+  assert.equal(lead.source, "Alibaba");
+  assert.equal(lead.sourceReference, "DEMO-CN-01");
+  assert.equal(lead.organization.name, "虚构采购公司");
+  assert.equal(lead.contact.name, "林样例");
+  assert.equal(lead.inquiry.product, "收纳盒");
+  assert.equal(lead.inquiry.quantity, "500");
+});

@@ -5,21 +5,27 @@ import { basename, extname, resolve } from "node:path";
 import { findDuplicateCandidates, leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
 
 function usage() {
-  return "用法：npm run qualify -- <inquiries.csv|json> [--output result.json]";
+  return "用法：npm run qualify -- <inquiries.csv|json> [--channel auto|alibaba|made-in-china] [--output result.json]";
 }
 
 function parseArguments(args) {
-  const input = args.find((item) => !item.startsWith("--"));
-  const outputIndex = args.indexOf("--output");
-  return {
-    input,
-    output: outputIndex >= 0 ? args[outputIndex + 1] : null
-  };
+  const parsed = { input: null, output: null, channel: "auto" };
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (value === "--output") parsed.output = args[++index];
+    else if (value === "--channel") parsed.channel = args[++index];
+    else if (!value.startsWith("--") && !parsed.input) parsed.input = value;
+    else throw new Error(`无法识别的参数：${value}`);
+  }
+  if (!["auto", "alibaba", "made-in-china"].includes(parsed.channel)) {
+    throw new Error("channel 只能是 auto、alibaba 或 made-in-china");
+  }
+  return parsed;
 }
 
-async function loadLeads(path) {
+async function loadLeads(path, channel) {
   const content = await readFile(path, "utf8");
-  if (extname(path).toLowerCase() === ".csv") return leadsFromCsv(content);
+  if (extname(path).toLowerCase() === ".csv") return leadsFromCsv(content, { channel });
 
   const parsed = JSON.parse(content);
   const items = Array.isArray(parsed) ? parsed : parsed.leads;
@@ -27,14 +33,21 @@ async function loadLeads(path) {
   return items.map(normalizeLead);
 }
 
-const args = parseArguments(process.argv.slice(2));
-if (!args.input) {
+let args;
+try {
+  args = parseArguments(process.argv.slice(2));
+} catch (error) {
+  console.error(`${error.message}\n${usage()}`);
+  process.exitCode = 1;
+}
+
+if (args && !args.input) {
   console.error(usage());
   process.exitCode = 1;
-} else {
+} else if (args) {
   try {
     const inputPath = resolve(args.input);
-    const leads = await loadLeads(inputPath);
+    const leads = await loadLeads(inputPath, args.channel);
     const result = {
       format: "lydia-qualified-leads",
       schemaVersion: 1,

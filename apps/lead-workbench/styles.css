@@ -57,6 +57,8 @@ h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(3
 .button:hover { transform: translateY(-1px); }
 .button.ghost { color: var(--forest); background: #e9eee8; }
 .button.primary { color: #fff; background: var(--forest); box-shadow: 0 9px 24px rgb(31 86 62 / 20%); }
+.channel-row { display: grid; grid-template-columns: auto minmax(190px, 260px) 1fr; align-items: center; gap: 12px; margin: -4px 0 18px; color: var(--ink); font-size: 13px; font-weight: 750; }
+.channel-row small { color: var(--muted); font-weight: 450; line-height: 1.45; }
 .drop-zone { min-height: 174px; display: grid; place-items: center; align-content: center; gap: 9px; border: 1.5px dashed #a8b3aa; border-radius: 16px; background: #f7f8f3; cursor: pointer; text-align: center; transition: border-color .18s ease, background .18s ease; }
 .drop-zone:hover, .drop-zone.dragging { border-color: var(--forest); background: #eef5ed; }
 .drop-zone input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
@@ -112,6 +114,7 @@ footer { border-top: 1px solid var(--line); padding: 26px 20px 38px; color: var(
   .hero-grid { grid-template-columns: 1fr; gap: 38px; margin-top: 62px; }
   .hero-metric { display: none; }
   .panel-heading, .results-heading { align-items: stretch; flex-direction: column; }
+  .channel-row { grid-template-columns: 1fr; }
   .toolbar { flex-wrap: wrap; }
   .summary-grid { grid-template-columns: repeat(3, 1fr); }
   .lead-card { grid-template-columns: 58px 1fr; }

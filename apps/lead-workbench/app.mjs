@@ -25,7 +25,9 @@ function leadsFromJson(payload) {
 
 async function parseFile(file) {
   const text = await file.text();
-  if (file.name.toLowerCase().endsWith(".csv")) return leadsFromCsv(text);
+  if (file.name.toLowerCase().endsWith(".csv")) {
+    return leadsFromCsv(text, { channel: $("#channel").value });
+  }
   return leadsFromJson(JSON.parse(text));
 }
 
@@ -198,7 +200,7 @@ $("#loadSample").addEventListener("click", async () => {
   try {
     const response = await fetch("/examples/inquiries.sample.csv");
     if (!response.ok) throw new Error("无法读取虚构样例");
-    showResult(leadsFromCsv(await response.text()), "inquiries.sample.csv");
+    showResult(leadsFromCsv(await response.text(), { channel: "auto" }), "inquiries.sample.csv");
   } catch (error) {
     setStatus(error.message, "error");
   }

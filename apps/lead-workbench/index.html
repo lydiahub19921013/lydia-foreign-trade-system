@@ -41,6 +41,16 @@
           <button id="loadSample" class="button ghost" type="button">使用虚构样例</button>
         </div>
 
+        <label class="channel-row">
+          <span>这批询盘来自</span>
+          <select id="channel">
+            <option value="auto">自动 / Lydia 标准表</option>
+            <option value="alibaba">阿里巴巴</option>
+            <option value="made-in-china">中国制造网</option>
+          </select>
+          <small>渠道导出字段可能调整；系统会识别常见中英文字段，导入后仍需抽查。</small>
+        </label>
+
         <label id="dropZone" class="drop-zone" for="leadFile">
           <input id="leadFile" type="file" accept=".csv,.json,text/csv,application/json" />
           <span class="drop-icon">↗</span>

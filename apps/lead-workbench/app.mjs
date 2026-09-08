@@ -1,5 +1,9 @@
 import {
+  assessEmailCandidates,
+  checkEmailCandidateLeadMatch,
+  createEvidence,
   findDuplicateCandidates,
+  generateEmailCandidates,
   leadsFromCsv,
   mergeEvidenceIntoLead,
   normalizeLead,
@@ -13,6 +17,7 @@ const $ = (selector) => document.querySelector(selector);
 let currentResult = null;
 let currentCompanyResearch = null;
 let currentWebsiteResearch = null;
+let currentEmailResearch = null;
 let currentRelationshipResult = null;
 
 function updateStatus(selector, message, type = "neutral") {
@@ -56,7 +61,7 @@ function buildResult(leads, sourceFile) {
 }
 
 function populateResearchLeadTargets() {
-  for (const selector of ["#companyTargetLead", "#websiteTargetLead"]) {
+  for (const selector of ["#companyTargetLead", "#websiteTargetLead", "#emailTargetLead"]) {
     const select = $(selector);
     const previous = select.value;
     select.replaceChildren();
@@ -77,6 +82,17 @@ function populateResearchLeadTargets() {
     select.disabled = false;
     if ([...select.options].some((option) => option.value === previous)) select.value = previous;
   }
+  prefillEmailInputs(false);
+}
+
+function prefillEmailInputs(force = true) {
+  const targetId = $("#emailTargetLead")?.value;
+  const item = currentResult?.results.find((result) => result.lead.id === targetId);
+  if (!item) return;
+  const nameInput = $("#emailContactName");
+  const domainInput = $("#emailDomain");
+  if (force || !nameInput.value) nameInput.value = item.lead.contact.name || "";
+  if (force || !domainInput.value) domainInput.value = item.lead.organization.domain || item.lead.organization.website || "";
 }
 
 function attachResearchEvidence(targetSelector, enrichment, statusSelector, sourceLabel) {
@@ -478,6 +494,122 @@ async function searchWebsite(event) {
   }
 }
 
+function candidateStatus(candidate) {
+  if (candidate.status === "rejected") return { label: "域名无邮件路由", className: "rejected" };
+  if (candidate.listedOnWebsite) return { label: "官网公开候选", className: "published" };
+  if (candidate.domainStatus === "mx-found") return { label: "域名存在 MX", className: "" };
+  return { label: "仍需补证", className: "" };
+}
+
+function emailCandidateCard(candidate) {
+  const card = document.createElement("article");
+  card.className = "email-card";
+  const address = document.createElement("div");
+  address.className = "email-address";
+  const email = document.createElement("strong");
+  email.textContent = candidate.email;
+  const type = document.createElement("small");
+  type.textContent = candidate.type === "role" ? "企业职能邮箱候选" : `联系人邮箱候选 · ${candidate.pattern}`;
+  address.append(email, type);
+
+  const signals = document.createElement("div");
+  signals.className = "email-signals";
+  signals.textContent = candidate.signals.length ? candidate.signals.join(" · ") : candidate.reason;
+
+  const actions = document.createElement("div");
+  const status = candidateStatus(candidate);
+  const badge = document.createElement("span");
+  badge.className = `email-status-badge${status.className ? ` ${status.className}` : ""}`;
+  badge.textContent = status.label;
+  const save = document.createElement("button");
+  save.className = "button ghost compact";
+  save.type = "button";
+  save.textContent = "作为候选加入询盘";
+  save.disabled = candidate.status === "rejected";
+  save.addEventListener("click", () => {
+    const targetId = $("#emailTargetLead").value;
+    const target = currentResult?.results.find((item) => item.lead.id === targetId)?.lead;
+    const match = checkEmailCandidateLeadMatch(target, candidate.domain);
+    if (!match.allowed) {
+      const detail = match.existingDomain
+        ? `该询盘已有企业域名 ${match.existingDomain}，与候选域名 ${match.candidateDomain} 不一致。`
+        : `${match.reason}，请先人工修正。`;
+      updateStatus("#emailStatus", `不能加入：${detail}`, "error");
+      return;
+    }
+    const sourceRef = candidate.listedOnWebsite
+      ? currentEmailResearch.websiteSourceRef
+      : currentEmailResearch.mailDomain.sourceRef;
+    const confidence = candidate.listedOnWebsite ? 0.75 : candidate.domainStatus === "mx-found" ? 0.45 : 0.3;
+    const emailEvidence = createEvidence({
+      kind: "business-email",
+      value: candidate.email,
+      sourceRef,
+      observedAt: currentEmailResearch.observedAt,
+      confidence,
+      status: candidate.status === "inconclusive" ? "inconclusive" : "candidate",
+      note: candidate.listedOnWebsite
+        ? "指定官网页面公开列出，但尚未验证当前可投递、联系人身份或营销同意"
+        : "根据姓名/职能命名规则生成；DNS 只检查域名邮件路由，不证明该邮箱存在"
+    });
+    attachResearchEvidence("#emailTargetLead", {
+      organization: { domain: candidate.domain },
+      contact: { email: candidate.email },
+      evidence: [currentEmailResearch.mailDomain.evidence, emailEvidence]
+    }, "#emailStatus", "候选邮箱" );
+  });
+  actions.className = "card-actions";
+  actions.append(badge, save);
+  card.append(address, signals, actions);
+  return card;
+}
+
+function renderEmailCandidates() {
+  const container = $("#emailResults");
+  container.replaceChildren(...currentEmailResearch.candidates.map(emailCandidateCard));
+}
+
+async function generateAndCheckEmailCandidates(event) {
+  event.preventDefault();
+  const button = $("#generateEmailCandidates");
+  button.disabled = true;
+  updateStatus("#emailStatus", "正在生成候选并检查企业域名邮件路由……");
+  try {
+    const generated = generateEmailCandidates($("#emailContactName").value, $("#emailDomain").value);
+    const domain = generated[0].domain;
+    const response = await fetch(`/api/mail-domain/check?${new URLSearchParams({ domain })}`);
+    const mailDomain = await response.json();
+    if (!response.ok) throw new Error(mailDomain.error || "域名检查失败");
+    const publishedEmails = currentWebsiteResearch?.contacts?.emails || [];
+    const candidates = assessEmailCandidates(generated, mailDomain, publishedEmails);
+    currentEmailResearch = {
+      format: "lydia-email-candidates",
+      schemaVersion: 1,
+      product: "Lydia 外贸系统",
+      generatedAt: new Date().toISOString(),
+      observedAt: mailDomain.observedAt,
+      contactName: $("#emailContactName").value.trim() || null,
+      domain,
+      mailDomain,
+      websiteSourceRef: currentWebsiteResearch?.finalUrl || null,
+      candidates,
+      disclaimer: "所有具体邮箱仍是候选；MX、官网公开或命名规则都不等于可投递性、联系人身份或营销同意。"
+    };
+    renderEmailCandidates();
+    $("#exportEmailCandidates").disabled = false;
+    const publishedCount = candidates.filter((candidate) => candidate.listedOnWebsite).length;
+    const routeText = mailDomain.status === "mx-found" ? "域名存在 MX" : mailDomain.status === "no-mail-route" ? "域名没有邮件路由" : "域名邮件路由仍不确定";
+    updateStatus("#emailStatus", `生成 ${candidates.length} 个候选；${routeText}；${publishedCount} 个被当前官网页面公开列出。具体邮箱仍未验证。`, mailDomain.status === "no-mail-route" ? "error" : "success");
+  } catch (error) {
+    currentEmailResearch = null;
+    $("#emailResults").replaceChildren();
+    $("#exportEmailCandidates").disabled = true;
+    updateStatus("#emailStatus", error.message || "候选邮箱生成失败。", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function relationshipPathsFromFile(file) {
   const text = await file.text();
   if (file.name.toLowerCase().endsWith(".csv")) return relationshipsFromCsv(text);
@@ -591,6 +723,14 @@ $("#exportWebsiteEvidence").addEventListener("click", () => {
   if (!currentWebsiteResearch) return;
   downloadJson(currentWebsiteResearch, `Lydia-官网证据-${new Date().toISOString().slice(0, 10)}.json`);
   updateStatus("#websiteStatus", "官网候选证据已导出；公开联系方式仍不等于营销同意。", "success");
+});
+
+$("#emailTargetLead").addEventListener("change", () => prefillEmailInputs(true));
+$("#emailCandidateForm").addEventListener("submit", generateAndCheckEmailCandidates);
+$("#exportEmailCandidates").addEventListener("click", () => {
+  if (!currentEmailResearch) return;
+  downloadJson(currentEmailResearch, `Lydia-候选邮箱-${new Date().toISOString().slice(0, 10)}.json`);
+  updateStatus("#emailStatus", "候选邮箱已导出；使用前仍需取得合规基础并人工复核。", "success");
 });
 
 $("#relationshipFile").addEventListener("change", (event) => loadRelationshipFile(event.target.files[0]));

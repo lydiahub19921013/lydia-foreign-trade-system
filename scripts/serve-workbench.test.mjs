@@ -115,6 +115,33 @@ test("workbench server does not expose website provider failures", async () => {
   });
 });
 
+test("workbench server checks only a normalized mail domain", async () => {
+  const calls = [];
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/mail-domain/check?domain=buyer.example.com`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).status, "mx-found");
+    assert.deepEqual(calls, ["buyer.example.com"]);
+  }, {
+    mailDomainCheck: async (domain) => {
+      calls.push(domain);
+      return { provider: "dns", domain, status: "mx-found" };
+    }
+  });
+});
+
+test("workbench server rejects invalid mail domain input", async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/mail-domain/check`);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /请输入/);
+  }, {
+    mailDomainCheck: async () => {
+      throw new Error("请输入企业域名或官网地址");
+    }
+  });
+});
+
 test("workbench server rejects writes and path traversal", async () => {
   await withServer(async (origin) => {
     assert.equal((await fetch(origin, { method: "POST" })).status, 405);

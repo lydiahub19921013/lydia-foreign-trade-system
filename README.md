@@ -13,6 +13,7 @@ Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信�
 
 - 主动查询 GLEIF 官方 LEI 数据，核对海外企业的法定名称、登记编号、地址与状态；
 - 主动读取一张公开或已授权的公司官网页面，提取带来源的候选邮箱、电话、WhatsApp、地址及工厂自述；
+- 用联系人英文名和企业域名生成有限的候选邮箱，检查域名邮件路由并阻止错配客户；
 - 导入客户自己拥有或授权的通讯录/CRM 关系记录，排除拒绝路径并给出熟人引荐顺序。
 
 ## 立即使用
@@ -31,7 +32,7 @@ npm run qualify -- examples/inquiries.sample.csv --output ./qualification-result
 npm run check
 ```
 
-所有示例均为虚构数据。询盘和关系文件只在浏览器页面处理，不抓取社媒、不发送消息。只有使用者主动查询时才联网：GLEIF 接收企业名称和可选司法辖区；指定官网只接收正常网页请求。询盘正文、关系文件和其他联系人资料不会发送。官网公开联系方式全部先视为候选，也不等于营销同意。
+所有示例均为虚构数据。询盘和关系文件只在浏览器页面处理，不抓取社媒、不发送消息。只有使用者主动查询时才联网：GLEIF 接收企业名称和可选司法辖区；指定官网只接收正常网页请求；邮箱候选只查询企业域名 DNS，联系人姓名不离开浏览器。询盘正文、关系文件和其他联系人资料不会发送。官网公开联系方式和生成邮箱全部先视为候选，也不等于营销同意。
 
 ## 系统边界
 
@@ -57,4 +58,4 @@ git subtree pull --prefix apps/communication-extension \
 
 ## 规划
 
-详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。
+详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[候选邮箱](./docs/EMAIL_CANDIDATES.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。

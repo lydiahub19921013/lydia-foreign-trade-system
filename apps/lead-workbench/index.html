@@ -146,10 +146,39 @@
         <div id="websiteResults" class="research-results"></div>
       </section>
 
+      <section class="email-panel" aria-labelledby="email-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 05 · 候选邮箱</p>
+            <h2 id="email-title">生成候选，不冒充验证</h2>
+          </div>
+          <button id="exportEmailCandidates" class="button ghost" type="button" disabled>导出候选邮箱</button>
+        </div>
+
+        <form id="emailCandidateForm" class="research-form">
+          <label>
+            <span>联系人英文名（可选）</span>
+            <input id="emailContactName" maxlength="200" placeholder="例如：Alex Morgan" />
+          </label>
+          <label>
+            <span>企业域名或官网</span>
+            <input id="emailDomain" maxlength="500" required placeholder="buyer.example.com" />
+          </label>
+          <button id="generateEmailCandidates" class="button primary" type="submit">生成并检查域名</button>
+        </form>
+        <p class="privacy-note">姓名只在当前浏览器参与组合，不会发送给第三方；本机只对企业域名做 DNS 邮件路由查询，不连接邮件服务器、不发送测试邮件。即使官网列出或域名存在 MX，具体邮箱仍不是“已验证可投递”。</p>
+        <label class="target-picker">
+          <span>保存候选到</span>
+          <select id="emailTargetLead" disabled><option value="">请先导入询盘</option></select>
+        </label>
+        <p id="emailStatus" class="status" role="status" aria-live="polite">尚未生成候选邮箱。</p>
+        <div id="emailResults" class="email-results"></div>
+      </section>
+
       <section class="relationship-panel" aria-labelledby="relationship-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 05 · 信任路径</p>
+            <p class="section-label">STEP 06 · 信任路径</p>
             <h2 id="relationship-title">谁适合帮你建立信任</h2>
           </div>
           <div class="toolbar">

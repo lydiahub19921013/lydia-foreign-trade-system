@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchGleifEntities } from "../integrations/gleif/client.mjs";
+import { checkMailDomain } from "../integrations/mail-domain/check.mjs";
 import { fetchPublicWebsiteSnapshot } from "../integrations/public-website/snapshot.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,6 +39,7 @@ function writeJson(response, status, payload, method = "GET") {
 
 export function createWorkbenchServer(options = {}) {
   const gleifSearch = options.gleifSearch || searchGleifEntities;
+  const mailDomainCheck = options.mailDomainCheck || checkMailDomain;
   const websiteSnapshot = options.websiteSnapshot || fetchPublicWebsiteSnapshot;
 
   return createServer(async (request, response) => {
@@ -78,6 +80,16 @@ export function createWorkbenchServer(options = {}) {
         writeJson(response, inputError ? 400 : 502, {
           error: inputError ? message : "官网暂时无法读取，请检查网址或稍后重试。"
         }, request.method);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/mail-domain/check") {
+      try {
+        writeJson(response, 200, await mailDomainCheck(url.searchParams.get("domain") || ""), request.method);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "域名格式不正确";
+        writeJson(response, 400, { error: message }, request.method);
       }
       return;
     }

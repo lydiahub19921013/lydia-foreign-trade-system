@@ -47,8 +47,8 @@ h1 em { color: var(--lime); font-weight: 500; }
 .hero-metric p { color: rgb(255 255 255 / 64%); line-height: 1.7; }
 
 main { width: min(1180px, calc(100% - 40px)); margin: -30px auto 80px; position: relative; }
-.import-panel, .dashboard, .research-panel, .website-panel, .relationship-panel { background: var(--card); border: 1px solid rgb(255 255 255 / 75%); border-radius: 22px; box-shadow: var(--shadow); padding: 34px; }
-.dashboard, .research-panel, .website-panel, .relationship-panel { margin-top: 24px; }
+.import-panel, .dashboard, .research-panel, .website-panel, .email-panel, .relationship-panel { background: var(--card); border: 1px solid rgb(255 255 255 / 75%); border-radius: 22px; box-shadow: var(--shadow); padding: 34px; }
+.dashboard, .research-panel, .website-panel, .email-panel, .relationship-panel { margin-top: 24px; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .section-label { color: var(--forest); }
 h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(30px, 4vw, 46px); font-weight: 500; letter-spacing: -.035em; }
@@ -131,6 +131,15 @@ input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-co
 .contact-group { min-width: 0; border-radius: 12px; background: #f7f5ef; padding: 13px; }
 .contact-group strong { display: block; margin-bottom: 6px; font-size: 12px; }
 .contact-group p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.email-results { display: grid; gap: 9px; margin-top: 18px; }
+.email-card { display: grid; grid-template-columns: minmax(260px, 1fr) auto auto; align-items: center; gap: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; padding: 15px 17px; }
+.email-address { min-width: 0; }
+.email-address strong { display: block; overflow-wrap: anywhere; }
+.email-address small { display: block; margin-top: 4px; color: var(--muted); }
+.email-signals { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.email-status-badge { border-radius: 999px; padding: 6px 9px; color: #685f57; background: #f2efe8; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.email-status-badge.published { color: var(--forest-dark); background: #e6f7da; }
+.email-status-badge.rejected { color: #8d3529; background: #f5e6df; }
 .company-card .evidence-toggle { margin-top: 16px; }
 
 .compact-drop-zone { display: grid; gap: 5px; border: 1.5px dashed #a8b3aa; border-radius: 16px; background: #f7f8f3; padding: 22px; cursor: pointer; }
@@ -175,11 +184,12 @@ footer { border-top: 1px solid var(--line); padding: 26px 20px 38px; color: var(
   .hero { padding-bottom: 52px; }
   h1 { font-size: 46px; }
   main { width: min(100% - 20px, 1180px); }
-  .import-panel, .dashboard, .research-panel, .website-panel, .relationship-panel { padding: 23px 18px; border-radius: 17px; }
+  .import-panel, .dashboard, .research-panel, .website-panel, .email-panel, .relationship-panel { padding: 23px 18px; border-radius: 17px; }
   .toolbar, .toolbar label, .toolbar select, .toolbar .button { width: 100%; }
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
   .company-heading { flex-direction: column; }
   .fact-grid { grid-template-columns: 1fr; }
   .contact-grid { grid-template-columns: 1fr; }
   .relationship-card { grid-template-columns: 1fr; }
+  .email-card { grid-template-columns: 1fr; align-items: stretch; }
 }

@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createEvidence,
+  assessEmailCandidates,
+  checkEmailCandidateLeadMatch,
   findDuplicateCandidates,
+  generateEmailCandidates,
   leadsFromCsv,
   mergeEvidenceIntoLead,
   normalizeLead,
@@ -180,4 +183,38 @@ test("confirmed research evidence fills empty fields without overwriting custome
   assert.equal(merged.contact.email, "manual@example.com");
   assert.equal(merged.contact.whatsapp, "+1-555-0100");
   assert.equal(merged.evidence.length, 1);
+});
+
+test("email candidates use a bounded explainable pattern set", () => {
+  const candidates = generateEmailCandidates("Álex Morgan", "https://www.buyer.example.com/contact");
+  assert.equal(candidates[0].email, "alex.morgan@buyer.example.com");
+  assert.ok(candidates.some((item) => item.email === "amorgan@buyer.example.com"));
+  assert.ok(candidates.some((item) => item.email === "export@buyer.example.com" && item.type === "role"));
+  assert.ok(candidates.length <= 10);
+  assert.ok(candidates.every((item) => item.status === "candidate"));
+  assert.throws(() => generateEmailCandidates("Alex Morgan", "127.0.0.1"), /格式不正确/);
+  assert.throws(() => generateEmailCandidates("Alex Morgan", "mail.internal"), /格式不正确/);
+});
+
+test("email candidates remain unverified even with MX or website evidence", () => {
+  const candidates = generateEmailCandidates("Alex Morgan", "buyer.example.com");
+  const assessed = assessEmailCandidates(candidates, { status: "mx-found" }, ["alex.morgan@buyer.example.com"]);
+  assert.equal(assessed[0].email, "alex.morgan@buyer.example.com");
+  assert.equal(assessed[0].listedOnWebsite, true);
+  assert.equal(assessed[0].status, "candidate");
+  assert.ok(assessed[0].signals.includes("域名存在 MX 邮件记录"));
+});
+
+test("email candidates are rejected when the domain has no mail route", () => {
+  const assessed = assessEmailCandidates(generateEmailCandidates("Alex Morgan", "buyer.example.com"), { status: "no-mail-route" });
+  assert.ok(assessed.every((item) => item.status === "rejected"));
+});
+
+test("candidate email cannot attach to a lead with a different company domain", () => {
+  const match = checkEmailCandidateLeadMatch({ organization: { website: "https://www.northstar.example/contact" } }, "northstar.example");
+  assert.equal(match.allowed, true);
+  assert.equal(match.existingDomain, "northstar.example");
+  const mismatch = checkEmailCandidateLeadMatch({ organization: { domain: "northstar.example" } }, "other.example");
+  assert.equal(mismatch.allowed, false);
+  assert.match(mismatch.reason, /不一致/);
 });

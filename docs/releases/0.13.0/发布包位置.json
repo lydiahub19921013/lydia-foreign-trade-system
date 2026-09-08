@@ -1,0 +1,60 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.13.0",
+    "sourceCommit": "95bfa11f77b773f255f842af073dfe2182f27a61",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "localPersistence": {
+    "snapshotFormat": "lydia-workbench-snapshot",
+    "snapshotSchemaVersion": 1,
+    "workspaceIndexFormat": "lydia-workspace-index",
+    "workspaceIndexSchemaVersion": 1,
+    "workspaceReferenceFormat": "lydia-workspace-reference",
+    "storage": "IndexedDB",
+    "databaseName": "lydia-foreign-trade-system",
+    "storeName": "workbench-snapshots",
+    "origin": "http://127.0.0.1:4173",
+    "localWorkspaceIsolationEnabled": true,
+    "legacySingleSnapshotMigrationTested": true,
+    "workspaceMarkedJsonExportEnabled": true,
+    "crossWorkspaceMarkedJsonImportBlocked": true,
+    "stateWhitelistEnabled": true,
+    "uiWhitelistEnabled": true,
+    "consentConfirmationPersisted": false,
+    "applicationEncryptionEnabled": false,
+    "crossDeviceSyncEnabled": false,
+    "serverTenantAuthorizationEnabled": false
+  },
+  "verification": {
+    "systemTests": 112,
+    "extensionTests": 24,
+    "scannedTextFiles": 170,
+    "browserQaUsedFictionalDataOnly": true,
+    "browserWorkspaceCreateRenameSwitchVerified": true,
+    "browserWorkspaceDataIsolationVerified": true,
+    "browserWorkspaceScopedClearVerified": true,
+    "browserWorkspaceDeleteVerified": true,
+    "browserLeadRestoreVerified": true,
+    "browserRelationshipRestoreVerified": true,
+    "browserConsentResetVerified": true,
+    "browserVisualQaVerified": true,
+    "browserLegacyMigrationVerified": false,
+    "browserDownloadedFileReimportVerified": false,
+    "browserClosedAndReopenedVerified": false,
+    "browserQuotaFailureVerified": false,
+    "realCustomerDataUsed": false
+  },
+  "verifiedAt": "2026-09-08T16:25:28+08:00"
+}

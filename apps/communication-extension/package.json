@@ -1,0 +1,17 @@
+{
+  "name": "foreign-trade-development-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "个人独立的 Chrome 外贸沟通辅助工具",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "verify": "node scripts/verify-build.mjs",
+    "package": "npm run build && npm run verify && node scripts/package.mjs",
+    "check": "npm test && npm run package"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

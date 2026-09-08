@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>外贸开发插件</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">LOCAL-FIRST · PERSONAL TOOL</p>
+        <h1>外贸开发插件</h1>
+        <p class="subtitle">看懂客户来信，生成稳妥回复，留下可继续跟进的客户资料。</p>
+      </div>
+      <span class="version">v0.1.0</span>
+    </header>
+
+    <main>
+      <p id="status" class="status" role="status" aria-live="polite">默认离线处理，客户数据保存在本机。</p>
+
+      <section class="panel primary-panel">
+        <div class="section-heading">
+          <div>
+            <span class="step">01</span>
+            <h2>客户说了什么？</h2>
+          </div>
+          <button id="clearDraft" class="text-button" type="button">清空</button>
+        </div>
+
+        <label for="message">客户原话</label>
+        <textarea id="message" rows="8" placeholder="粘贴客户的英文邮件或聊天消息……"></textarea>
+
+        <div id="scenarioResult" class="scenario-result muted">
+          <span id="scenarioLabel">等待识别</span>
+          <small id="scenarioHint">粘贴消息后可自动判断沟通阶段</small>
+        </div>
+
+        <div class="two-columns">
+          <label>
+            使用背景
+            <select id="mode">
+              <option value="generic">通用回复</option>
+              <option value="industry">行业背景</option>
+              <option value="company">我的公司</option>
+            </select>
+          </label>
+          <label>
+            语气
+            <select id="tone">
+              <option value="professional">专业</option>
+              <option value="concise">简洁</option>
+              <option value="warm">友好</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="actions">
+          <button id="detect" class="secondary" type="button">识别场景</button>
+          <button id="generate" class="primary" type="button">生成英文回复</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <span class="step">02</span>
+            <h2>可编辑回复</h2>
+          </div>
+          <span id="providerBadge" class="badge">尚未生成</span>
+        </div>
+        <textarea id="reply" rows="11" placeholder="生成后仍需由你检查价格、交期、认证和承诺。"></textarea>
+        <div class="actions right">
+          <button id="copyReply" class="secondary" type="button">复制回复</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <span class="step">03</span>
+            <h2>客户资料</h2>
+          </div>
+          <button id="newCustomer" class="text-button" type="button">新客户</button>
+        </div>
+
+        <label>
+          已有客户
+          <select id="customerSelect">
+            <option value="">未关联客户</option>
+          </select>
+        </label>
+        <input id="customerId" type="hidden" />
+        <div class="two-columns">
+          <label>
+            联系人
+            <input id="customerName" type="text" maxlength="80" placeholder="例如 Maria" />
+          </label>
+          <label>
+            公司
+            <input id="customerCompany" type="text" maxlength="120" placeholder="客户公司" />
+          </label>
+        </div>
+        <label>
+          国家或市场
+          <input id="customerCountry" type="text" maxlength="80" placeholder="例如 Germany" />
+        </label>
+        <label>
+          跟进备注
+          <textarea id="customerNotes" rows="3" maxlength="1000" placeholder="需求、偏好、下一步……"></textarea>
+        </label>
+        <div class="actions right">
+          <button id="saveCustomer" class="secondary" type="button">保存客户</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <span class="step">04</span>
+            <h2>最近回复</h2>
+          </div>
+          <span id="historyCount" class="badge">0 条</span>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <details class="panel settings-panel">
+        <summary>
+          <span><span class="step">05</span>背景与 AI 设置</span>
+          <small>默认不联网</small>
+        </summary>
+        <div class="details-body">
+          <label>
+            行业背景
+            <textarea id="industryProfile" rows="3" maxlength="2000" placeholder="例如：industrial lighting, project-based orders……"></textarea>
+          </label>
+          <label>
+            我的公司信息
+            <textarea id="companyProfile" rows="4" maxlength="3000" placeholder="只填写你愿意用于回复的事实，如产品、优势、市场。"></textarea>
+          </label>
+          <label>
+            英文签名
+            <textarea id="signature" rows="3" maxlength="500" placeholder="Name&#10;Title&#10;Email"></textarea>
+          </label>
+
+          <div class="ai-box">
+            <label class="toggle-row">
+              <input id="aiEnabled" type="checkbox" />
+              <span>
+                <strong>启用自己的 AI 接口</strong>
+                <small>开启后，生成时会把当前消息与所选背景发送到你配置的服务。</small>
+              </span>
+            </label>
+            <label>
+              Chat Completions 接口地址
+              <input id="aiEndpoint" type="url" placeholder="https://你的服务/v1/chat/completions" />
+            </label>
+            <label>
+              模型名称
+              <input id="aiModel" type="text" maxlength="200" placeholder="填写服务商提供的模型 ID" />
+            </label>
+            <label>
+              API Key（仅本机保存）
+              <input id="aiKey" type="password" autocomplete="off" placeholder="不会进入导出文件" />
+            </label>
+          </div>
+
+          <div class="actions right">
+            <button id="clearKey" class="text-button danger-text" type="button">清除密钥</button>
+            <button id="saveSettings" class="secondary" type="button">保存设置</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="panel settings-panel">
+        <summary>
+          <span><span class="step">06</span>备份与恢复</span>
+          <small id="dataSummary">0 位客户 · 0 条回复</small>
+        </summary>
+        <div class="details-body">
+          <p class="privacy-note">导出文件包含客户资料、回复历史和非敏感设置，但不会包含 API Key，AI 开关也会自动关闭。</p>
+          <div class="actions">
+            <button id="exportData" class="secondary" type="button">导出 JSON</button>
+            <label class="file-button">
+              导入备份
+              <input id="importData" type="file" accept="application/json,.json" />
+            </label>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <footer>个人独立工具 · 所有业务承诺请在发送前人工确认</footer>
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

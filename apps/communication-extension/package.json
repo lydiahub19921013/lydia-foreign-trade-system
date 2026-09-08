@@ -8,8 +8,9 @@
     "test": "node --test tests/*.test.mjs",
     "build": "node scripts/build.mjs",
     "verify": "node scripts/verify-build.mjs",
+    "verify:reproducible": "node scripts/verify-reproducible-package.mjs",
     "package": "npm run build && npm run verify && node scripts/package.mjs",
-    "check": "npm test && npm run package"
+    "check": "npm test && npm run package && npm run verify:reproducible"
   },
   "engines": {
     "node": ">=20"

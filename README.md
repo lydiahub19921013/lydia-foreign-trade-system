@@ -17,6 +17,7 @@ Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信�
 - 逐条勾选官网候选证据后再写入询盘或开发队列；未选内容不写入，跨公司域名会被阻止，人工选择也不会把 `candidate` 升级成已验证；
 - 对已入档证据执行有原因、有时间的驳回、恢复和修订；系统只回滚仍由该证据管理的字段，不覆盖后续人工修改；
 - 对重复客户候选人工选择“同一客户”或“不同客户”；同一客户必须指定主账户，次账户原始询盘仍完整保留，决定可以撤销重做；
+- 冻结询盘首次导入时的等级和分数，追加记录联系、回复、报价、样品、订单、成交、流失及下一步待办；按初始等级回看真实转化，误记活动可带原因撤回；
 - 用联系人英文名和企业域名生成有限的候选邮箱，检查域名邮件路由并阻止错配客户；
 - 导入客户自己拥有或授权的通讯录/CRM 关系记录，排除拒绝路径并给出熟人引荐顺序。
 
@@ -54,7 +55,7 @@ git subtree pull --prefix apps/communication-extension \
   https://github.com/lydiahub19921013/foreign-trade-development-plugin.git main --squash
 ```
 
-公开资料只能作为线索和证据，不能冒充已确认事实；候选邮箱不能写成“已验证邮箱”。官网结果必须逐条选择后才能进入客户档案，所选证据保留人工决定时间和具体来源。发现错误时应在客户证据中驳回或修订；完整规则见 [证据复核与字段回滚](./docs/EVIDENCE_REVIEW.md)。重复候选也不会自动合并或删除，详见 [重复客户与主账户](./docs/DUPLICATE_REVIEW.md)。系统不按姓名、国籍、性别等敏感或无关属性判断客户质量。
+公开资料只能作为线索和证据，不能冒充已确认事实；候选邮箱不能写成“已验证邮箱”。官网结果必须逐条选择后才能进入客户档案，所选证据保留人工决定时间和具体来源。发现错误时应在客户证据中驳回或修订；完整规则见 [证据复核与字段回滚](./docs/EVIDENCE_REVIEW.md)。重复候选也不会自动合并或删除，详见 [重复客户与主账户](./docs/DUPLICATE_REVIEW.md)。开发阶段和结果回测见 [客户开发记录](./docs/DEVELOPMENT_TRACKING.md)。系统不按姓名、国籍、性别等敏感或无关属性判断客户质量。
 
 ## 品牌与授权
 
@@ -62,4 +63,4 @@ git subtree pull --prefix apps/communication-extension \
 
 ## 规划
 
-详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[证据复核](./docs/EVIDENCE_REVIEW.md)、[重复客户](./docs/DUPLICATE_REVIEW.md)、[公开候选](./docs/PUBLIC_PROSPECTS.md)、[官网档案](./docs/WEBSITE_DOSSIER.md)、[候选邮箱](./docs/EMAIL_CANDIDATES.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。
+详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[客户开发记录](./docs/DEVELOPMENT_TRACKING.md)、[证据复核](./docs/EVIDENCE_REVIEW.md)、[重复客户](./docs/DUPLICATE_REVIEW.md)、[公开候选](./docs/PUBLIC_PROSPECTS.md)、[官网档案](./docs/WEBSITE_DOSSIER.md)、[候选邮箱](./docs/EMAIL_CANDIDATES.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。

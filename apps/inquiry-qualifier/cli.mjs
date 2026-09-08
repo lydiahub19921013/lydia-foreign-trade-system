@@ -5,10 +5,12 @@ import { basename, extname, resolve } from "node:path";
 import {
   SCHEMA_VERSION,
   findDuplicateCandidates,
+  initializeDevelopmentTracking,
   leadsFromCsv,
   listDuplicateDecisions,
   normalizeLead,
-  qualifyLead
+  qualifyLead,
+  summarizeDevelopment
 } from "../../packages/lead-core/src/index.mjs";
 
 function usage() {
@@ -54,16 +56,20 @@ if (args && !args.input) {
 } else if (args) {
   try {
     const inputPath = resolve(args.input);
-    const leads = await loadLeads(inputPath, args.channel);
+    const generatedAt = new Date().toISOString();
+    const leads = initializeDevelopmentTracking(await loadLeads(inputPath, args.channel), {
+      capturedAt: generatedAt
+    });
     const result = {
       format: "lydia-qualified-leads",
       schemaVersion: SCHEMA_VERSION,
       product: "Lydia 外贸系统",
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       sourceFile: basename(inputPath),
       count: leads.length,
       duplicateCandidates: findDuplicateCandidates(leads),
       duplicateDecisions: listDuplicateDecisions(leads),
+      developmentSummary: summarizeDevelopment(leads, { now: generatedAt }),
       results: leads.map((lead) => ({
         lead,
         qualification: qualifyLead(lead)

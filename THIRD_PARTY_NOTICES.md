@@ -14,5 +14,7 @@ Lydia 外贸系统没有导入任何第三方客户数据、用户资料、密�
 | [Dedupe](https://github.com/dedupeio/dedupe) | `3f61e79102910bd355e920a2df7e44c14c9cb247` | MIT | 研究记录匹配候选与人工标注分离；没有复制或捆绑其 Python 代码。 |
 | [Splink](https://github.com/moj-analytical-services/splink) | `1af8b6bb6dc3c3ee2842ae7a5b50d6e150a65143` | MIT | 研究多字段 blocking、比较与概率候选；当前没有引入其运行时或代码。 |
 | [GoldenMatch](https://github.com/benseverndev-oss/goldenmatch) | `4b8e0ae389415cd9f45e0aa6871b33c149ae44e2` | MIT | 借鉴稳定主实体、来源、追加式事件和可撤销 merge/split 原则；用 Lydia 数据结构独立实现，没有复制代码。 |
+| [Atomic CRM](https://github.com/marmelab/atomic-crm) | `b1213e62ad06561c96222415ad789e0cbc2b6e43` | MIT | 借鉴任务截止时间、销售阶段与聚合活动时间线彼此分离的产品结构；没有复制 React、Supabase 或数据库代码。 |
+| [Krayin CRM](https://github.com/krayin/laravel-crm) | `2c1209102a77969665b880af9dda730cf9748a04` | MIT | 借鉴 Lead、Pipeline/Stage、Activity、Quote 以及“停滞天数”分离建模；用 Lydia 的本地事件和外贸阶段独立实现。 |
 
 MIT 许可证文本按相关项目保存在 `third_party/licenses/`。未复制代码时保留说明是为了让来源和判断过程可审查；如以后真正引入代码，必须再次核对上游版本和许可证。

@@ -78,11 +78,40 @@
                 <option value="HOLD">HOLD · 暂停</option>
               </select>
             </label>
+            <label>
+              <span class="sr-only">筛选开发状态</span>
+              <select id="developmentFilter">
+                <option value="ALL">全部开发状态</option>
+                <option value="FOLLOW_UP">有待跟进</option>
+                <option value="OVERDUE">已经逾期</option>
+                <option value="new">尚未开发</option>
+                <option value="contacted">已联系</option>
+                <option value="replied">已回复</option>
+                <option value="quoted">已报价</option>
+                <option value="sampled">已寄样</option>
+                <option value="ordered">已收到订单</option>
+                <option value="won">已成交</option>
+                <option value="lost">已流失</option>
+              </select>
+            </label>
             <button id="exportResults" class="button primary" type="button">导出给沟通插件</button>
           </div>
         </div>
 
         <div id="summary" class="summary-grid"></div>
+
+        <section class="development-overview" aria-labelledby="development-overview-title">
+          <div class="development-overview-heading">
+            <div>
+              <p class="section-label">真实开发结果</p>
+              <h3 id="development-overview-title">分数有没有用，要看后续发生了什么</h3>
+            </div>
+            <p id="developmentBaselineStatus"></p>
+          </div>
+          <div id="developmentSummary" class="development-summary-grid"></div>
+          <div id="conversionTable" class="conversion-table"></div>
+          <p id="developmentStatus" class="status" role="status" aria-live="polite">可以开始记录联系、回复、报价、样品和成交结果。</p>
+        </section>
 
         <div id="duplicateNotice" class="duplicate-notice hidden"></div>
         <div id="duplicateReviewList" class="duplicate-review-list hidden"></div>
@@ -303,6 +332,87 @@
         <div class="dialog-actions">
           <button id="cancelDuplicateReview" class="button ghost" type="button">取消</button>
           <button id="duplicateReviewSubmit" class="button primary" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="developmentDialog" class="evidence-dialog" aria-labelledby="developmentDialogTitle">
+      <form id="developmentForm" method="dialog">
+        <p class="section-label">客户开发记录</p>
+        <h2 id="developmentDialogTitle">记录开发进展</h2>
+        <p id="developmentDialogDescription" class="dialog-description"></p>
+        <div class="dialog-fields development-dialog-grid">
+          <label>
+            <span>这次发生了什么</span>
+            <select id="developmentEventType" required>
+              <option value="contact-attempted">已联系客户</option>
+              <option value="buyer-replied">收到客户回复</option>
+              <option value="quote-sent">已发送报价</option>
+              <option value="sample-sent">已寄出样品</option>
+              <option value="order-received">已收到订单</option>
+              <option value="won">确认成交</option>
+              <option value="lost">确认流失</option>
+              <option value="reopened">重新进入开发</option>
+              <option value="note">只记录备注</option>
+            </select>
+          </label>
+          <label>
+            <span>发生时间</span>
+            <input id="developmentOccurredAt" type="datetime-local" required />
+          </label>
+          <label>
+            <span>沟通渠道</span>
+            <select id="developmentChannel">
+              <option value="">未指定</option>
+              <option value="platform">平台站内</option>
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="phone">电话</option>
+              <option value="meeting">会议</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label>
+            <span>流失原因（仅流失时选）</span>
+            <select id="developmentOutcomeReason">
+              <option value="">未指定</option>
+              <option value="price">价格</option>
+              <option value="timing">采购时间变化</option>
+              <option value="no-response">长期无回复</option>
+              <option value="fit">产品或能力不匹配</option>
+              <option value="trust">信任或资质不足</option>
+              <option value="competitor">选择其他供应商</option>
+              <option value="other">其他</option>
+            </select>
+          </label>
+          <label>
+            <span>订单/成交金额（可选）</span>
+            <input id="developmentAmount" type="number" min="0" step="0.01" placeholder="例如：8800" />
+          </label>
+          <label>
+            <span>币种（可选）</span>
+            <input id="developmentCurrency" maxlength="3" placeholder="USD" />
+          </label>
+        </div>
+        <label class="dialog-note">
+          <span>事实说明或原因</span>
+          <textarea id="developmentNote" maxlength="1000" rows="3" placeholder="只记录真实发生的情况；流失、重新开发或备注时至少填写 3 个字。"></textarea>
+        </label>
+        <div class="next-action-fields">
+          <strong>需要的话，同时安排下一步</strong>
+          <label>
+            <span>下一步做什么</span>
+            <input id="developmentNextAction" maxlength="240" placeholder="例如：确认客户对报价的反馈" />
+          </label>
+          <label>
+            <span>截止时间</span>
+            <input id="developmentNextDueAt" type="datetime-local" />
+          </label>
+        </div>
+        <p id="developmentDialogStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelDevelopment" class="button ghost" type="button">取消</button>
+          <button class="button primary" type="submit">保存开发记录</button>
         </div>
       </form>
     </dialog>

@@ -14,7 +14,7 @@
 
 ## 字段来源
 
-Lead schema 3 延续 schema 2 引入的 `fieldOrigins`，记录：
+Lead schema 3 及以后版本延续 schema 2 引入的 `fieldOrigins`，记录：
 
 - 字段路径，例如 `contact.email`；
 - 对应 Evidence ID；
@@ -25,7 +25,7 @@ Lead schema 3 延续 schema 2 引入的 `fieldOrigins`，记录：
 
 ## 沟通插件同步
 
-外贸开发插件 schema 3 记录上次由 Lydia 导入的客户字段。重新导入分级文件时：
+外贸开发插件可读取 schema 3 及以后版本，并记录上次由 Lydia 导入的客户字段。重新导入分级文件时：
 
 1. 字段仍等于上次 Lydia 导入值：允许更新或清空；
 2. 字段已被用户在插件中修改：保留人工值并停止由 Lydia 管理；

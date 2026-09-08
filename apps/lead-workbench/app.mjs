@@ -1,5 +1,6 @@
 import {
   SCHEMA_VERSION,
+  DEVELOPMENT_EVENT_LABELS,
   assessEmailCandidates,
   checkCompanyDomainMatch,
   checkEmailCandidateLeadMatch,
@@ -7,6 +8,8 @@ import {
   enrichmentFromEvidenceSelection,
   findDuplicateCandidates,
   generateEmailCandidates,
+  getDevelopmentState,
+  initializeDevelopmentTracking,
   leadsFromCsv,
   listDuplicateDecisions,
   mergeEvidenceIntoLead,
@@ -23,7 +26,10 @@ import {
   relationshipsFromCsv,
   relationshipsFromJson,
   reviewDuplicatePair,
-  reviseLeadEvidence
+  reviseLeadEvidence,
+  recordDevelopmentEvent,
+  summarizeDevelopment,
+  voidDevelopmentEvent
 } from "/packages/lead-core/src/index.mjs";
 
 const $ = (selector) => document.querySelector(selector);
@@ -38,6 +44,7 @@ let currentEmailResearch = null;
 let currentRelationshipResult = null;
 let pendingEvidenceAction = null;
 let pendingDuplicateAction = null;
+let pendingDevelopmentLeadId = null;
 
 function updateStatus(selector, message, type = "neutral") {
   const status = $(selector);
@@ -67,16 +74,20 @@ async function parseFile(file) {
 }
 
 function buildResult(leads, sourceFile) {
-  const normalizedLeads = leads.map(normalizeLead);
+  const generatedAt = new Date().toISOString();
+  const normalizedLeads = initializeDevelopmentTracking(leads.map(normalizeLead), {
+    capturedAt: generatedAt
+  });
   return {
     format: "lydia-qualified-leads",
     schemaVersion: SCHEMA_VERSION,
     product: "Lydia 外贸系统",
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     sourceFile,
     count: normalizedLeads.length,
     duplicateCandidates: findDuplicateCandidates(normalizedLeads),
     duplicateDecisions: listDuplicateDecisions(normalizedLeads),
+    developmentSummary: summarizeDevelopment(normalizedLeads, { now: generatedAt }),
     results: normalizedLeads.map((lead) => ({ lead, qualification: qualifyLead(lead) }))
   };
 }
@@ -87,11 +98,14 @@ function leadDisplayName(leadId) {
 }
 
 function refreshLeadResult(leads) {
-  currentResult.results = leads.map((lead) => ({ lead, qualification: qualifyLead(lead) }));
-  currentResult.count = leads.length;
-  currentResult.generatedAt = new Date().toISOString();
-  currentResult.duplicateCandidates = findDuplicateCandidates(leads);
-  currentResult.duplicateDecisions = listDuplicateDecisions(leads);
+  const generatedAt = new Date().toISOString();
+  const trackedLeads = initializeDevelopmentTracking(leads, { capturedAt: generatedAt });
+  currentResult.results = trackedLeads.map((lead) => ({ lead, qualification: qualifyLead(lead) }));
+  currentResult.count = trackedLeads.length;
+  currentResult.generatedAt = generatedAt;
+  currentResult.duplicateCandidates = findDuplicateCandidates(trackedLeads);
+  currentResult.duplicateDecisions = listDuplicateDecisions(trackedLeads);
+  currentResult.developmentSummary = summarizeDevelopment(trackedLeads, { now: generatedAt });
 }
 
 function populateResearchLeadTargets() {
@@ -162,6 +176,89 @@ function summaryCard(label, value, grade) {
   return card;
 }
 
+function developmentSummaryCard(label, value, overdue = false) {
+  const card = document.createElement("div");
+  card.className = `development-summary-card${overdue ? " overdue" : ""}`;
+  const text = document.createElement("span");
+  text.textContent = label;
+  const count = document.createElement("strong");
+  count.textContent = value;
+  card.append(text, count);
+  return card;
+}
+
+function renderConversionTable(summary) {
+  const container = $("#conversionTable");
+  container.replaceChildren();
+  const groups = ["A", "B", "C", "D", "HOLD"]
+    .map((grade) => summary.byGrade[grade])
+    .filter((group) => group.leads > 0);
+  if (!groups.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-conversion";
+    empty.textContent = "导入询盘后会冻结当时的等级；记录真实开发结果后，才能比较各等级的转化。";
+    container.append(empty);
+    return;
+  }
+
+  const columns = [
+    ["等级", null],
+    ["线索", "leads"],
+    ["已联系", "contacted"],
+    ["已回复", "replied"],
+    ["已报价", "quoted"],
+    ["已寄样", "sampled"],
+    ["成交", "won"]
+  ];
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const [label] of columns) {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const group of groups) {
+    const row = document.createElement("tr");
+    for (const [label, key] of columns) {
+      const cell = document.createElement(key ? "td" : "th");
+      if (!key) {
+        cell.scope = "row";
+        cell.textContent = label === "等级" ? group.grade : label;
+      } else if (key === "leads") {
+        cell.textContent = String(group.leads);
+      } else {
+        const rate = group.rates[key];
+        cell.textContent = `${group[key]}${rate === null ? "" : ` · ${rate}%`}`;
+      }
+      row.append(cell);
+    }
+    body.append(row);
+  }
+  table.append(head, body);
+  container.append(table);
+}
+
+function renderDevelopmentSummary() {
+  const now = new Date().toISOString();
+  const summary = summarizeDevelopment(currentResult.results.map((item) => item.lead), { now });
+  currentResult.developmentSummary = summary;
+  const { totals } = summary;
+  $("#developmentSummary").replaceChildren(
+    developmentSummaryCard("待跟进 · 其中逾期", `${totals.openFollowUps} · ${totals.overdue}`, totals.overdue > 0),
+    developmentSummaryCard("已联系", totals.contacted),
+    developmentSummaryCard("已回复", totals.replied),
+    developmentSummaryCard("已报价", totals.quoted),
+    developmentSummaryCard("已寄样", totals.sampled),
+    developmentSummaryCard("已成交", totals.won)
+  );
+  $("#developmentBaselineStatus").textContent = `已冻结 ${totals.baselineTracked}/${totals.eligibleLeads} 个独立账户的导入时等级${totals.duplicateRecords ? `；另有 ${totals.duplicateRecords} 条次记录不进入分母` : ""}。统计只认人工记录的真实动作。`;
+  renderConversionTable(summary);
+}
+
 function renderSummary() {
   const counts = Object.fromEntries(["A", "B", "C", "D", "HOLD"].map((grade) => [grade, 0]));
   for (const item of currentResult.results) counts[item.qualification.grade] += 1;
@@ -182,6 +279,7 @@ function renderSummary() {
   } else {
     notice.classList.add("hidden");
   }
+  renderDevelopmentSummary();
   renderDuplicateReviews();
 }
 
@@ -480,8 +578,177 @@ function applyEvidenceAction(event) {
   }
 }
 
+const DEVELOPMENT_CHANNEL_LABELS = {
+  platform: "平台站内",
+  email: "Email",
+  whatsapp: "WhatsApp",
+  phone: "电话",
+  meeting: "会议",
+  other: "其他"
+};
+
+function formatMoment(value) {
+  return value ? new Date(value).toLocaleString("zh-CN") : "时间未记录";
+}
+
+function currentLocalDateTime() {
+  const date = new Date();
+  const local = new Date(date.valueOf() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function openDevelopmentDialog(lead) {
+  pendingDevelopmentLeadId = lead.id;
+  const state = getDevelopmentState(lead);
+  $("#developmentDialogTitle").textContent = `记录「${lead.organization.name || lead.contact.name || "未命名询盘"}」的进展`;
+  $("#developmentDialogDescription").textContent = `当前阶段：${state.stageLabel}。这里记录已经发生的事实；草稿、猜测和搜索候选不要当成客户动作。`;
+  $("#developmentEventType").value = ["won", "lost"].includes(state.stage) ? "reopened" : "contact-attempted";
+  $("#developmentOccurredAt").value = currentLocalDateTime();
+  $("#developmentChannel").value = "";
+  $("#developmentOutcomeReason").value = "";
+  $("#developmentAmount").value = "";
+  $("#developmentCurrency").value = "";
+  $("#developmentNote").value = "";
+  $("#developmentNextAction").value = "";
+  $("#developmentNextDueAt").value = "";
+  $("#developmentDialogStatus").textContent = "";
+  $("#developmentDialog").showModal();
+  $("#developmentEventType").focus();
+}
+
+function replaceLead(updatedLead, message) {
+  const leads = currentResult.results.map((item) => item.lead.id === updatedLead.id ? updatedLead : item.lead);
+  refreshLeadResult(leads);
+  renderSummary();
+  renderLeads();
+  updateStatus("#developmentStatus", message, "success");
+}
+
+function applyDevelopmentAction(event) {
+  event.preventDefault();
+  if (!pendingDevelopmentLeadId || !currentResult) return;
+  const item = currentResult.results.find((candidate) => candidate.lead.id === pendingDevelopmentLeadId);
+  if (!item) return;
+  const nextAction = $("#developmentNextAction").value.trim();
+  const nextDueAt = $("#developmentNextDueAt").value;
+  if (Boolean(nextAction) !== Boolean(nextDueAt)) {
+    updateStatus("#developmentDialogStatus", "安排下一步时，行动内容和截止时间必须同时填写。", "error");
+    return;
+  }
+  try {
+    let result = recordDevelopmentEvent(item.lead, {
+      type: $("#developmentEventType").value,
+      occurredAt: $("#developmentOccurredAt").value,
+      channel: $("#developmentChannel").value,
+      note: $("#developmentNote").value,
+      outcomeReason: $("#developmentOutcomeReason").value,
+      amount: $("#developmentAmount").value,
+      currency: $("#developmentCurrency").value
+    });
+    if (nextAction) {
+      result = recordDevelopmentEvent(result.lead, {
+        type: "follow-up-scheduled",
+        occurredAt: $("#developmentOccurredAt").value,
+        dueAt: nextDueAt,
+        note: nextAction
+      });
+    }
+    const label = DEVELOPMENT_EVENT_LABELS[$("#developmentEventType").value];
+    $("#developmentDialog").close();
+    pendingDevelopmentLeadId = null;
+    replaceLead(result.lead, `${label}已保存；导入时的等级基线没有被事后结果改写。`);
+  } catch (error) {
+    updateStatus("#developmentDialogStatus", error.message || "开发记录保存失败。", "error");
+  }
+}
+
+function completeFollowUp(lead, followUp) {
+  try {
+    const result = recordDevelopmentEvent(lead, {
+      type: "follow-up-completed",
+      relatedEventId: followUp.id,
+      note: `完成：${followUp.note || "既定跟进"}`
+    });
+    replaceLead(result.lead, "这项跟进已完成；原计划和完成时间都保留在记录中。");
+  } catch (error) {
+    updateStatus("#developmentStatus", error.message || "无法完成这项跟进。", "error");
+  }
+}
+
+function voidActivity(lead, activity) {
+  const reason = window.prompt("请输入撤回原因（至少 3 个字）。原记录不会删除，只会标记为已撤回。", "");
+  if (reason === null) return;
+  try {
+    const result = voidDevelopmentEvent(lead, activity.id, { note: reason });
+    replaceLead(result.lead, "错误记录已撤回；原内容和撤回原因仍保留在审计历史中。");
+  } catch (error) {
+    updateStatus("#developmentStatus", error.message || "无法撤回这条开发记录。", "error");
+  }
+}
+
+function developmentTimeline(lead, state) {
+  const details = document.createElement("details");
+  details.className = "development-toggle";
+  const summary = document.createElement("summary");
+  summary.textContent = `开发记录（${lead.development.events.length} 条）· ${state.stageLabel}`;
+  details.append(summary);
+  if (!lead.development.events.length) {
+    const empty = document.createElement("p");
+    empty.className = "development-empty";
+    empty.textContent = "还没有真实开发记录。分级是排序建议，不是客户已经回复或会成交。";
+    details.append(empty);
+    return details;
+  }
+
+  const list = document.createElement("ul");
+  list.className = "development-list";
+  for (const activity of [...state.events].reverse()) {
+    const item = document.createElement("li");
+    item.className = `development-item${activity.voided ? " voided" : ""}${activity.type === "activity-voided" ? " correction" : ""}`;
+    const body = document.createElement("div");
+    body.className = "development-item-body";
+    const title = document.createElement("strong");
+    title.textContent = DEVELOPMENT_EVENT_LABELS[activity.type] || activity.type;
+    const meta = document.createElement("small");
+    meta.textContent = [
+      formatMoment(activity.occurredAt),
+      DEVELOPMENT_CHANNEL_LABELS[activity.channel],
+      activity.voided ? "已撤回" : null
+    ].filter(Boolean).join(" · ");
+    body.append(title, meta);
+    if (activity.note) {
+      const note = document.createElement("span");
+      note.textContent = activity.note;
+      body.append(note);
+    }
+    if (activity.dueAt) {
+      const due = document.createElement("small");
+      due.textContent = `截止：${formatMoment(activity.dueAt)}`;
+      body.append(due);
+    }
+    if (activity.amount !== null) {
+      const amount = document.createElement("small");
+      amount.textContent = `金额：${activity.currency || "未指定币种"} ${activity.amount}`;
+      body.append(amount);
+    }
+    item.append(body);
+    if (activity.type !== "activity-voided" && !activity.voided) {
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "button ghost compact";
+      undo.textContent = "撤回";
+      undo.addEventListener("click", () => voidActivity(lead, activity));
+      item.append(undo);
+    }
+    list.append(item);
+  }
+  details.append(list);
+  return details;
+}
+
 function leadCard(item) {
   const { lead, qualification } = item;
+  const developmentState = item.developmentState || getDevelopmentState(lead);
   const card = document.createElement("article");
   card.className = "lead-card";
 
@@ -503,6 +770,32 @@ function leadCard(item) {
   action.className = "lead-action";
   action.textContent = qualification.nextAction;
   main.append(title, meta, contacts);
+  const developmentRow = document.createElement("div");
+  developmentRow.className = "development-state-row";
+  const stage = document.createElement("span");
+  stage.className = `development-stage ${developmentState.stage}`;
+  stage.textContent = developmentState.stageLabel;
+  const record = document.createElement("button");
+  record.type = "button";
+  record.className = "button ghost compact";
+  record.textContent = "记录开发进展";
+  record.addEventListener("click", () => openDevelopmentDialog(lead));
+  developmentRow.append(stage, record);
+  if (developmentState.nextAction) {
+    const complete = document.createElement("button");
+    complete.type = "button";
+    complete.className = "button primary compact";
+    complete.textContent = "完成待办";
+    complete.addEventListener("click", () => completeFollowUp(lead, developmentState.nextAction));
+    developmentRow.append(complete);
+  }
+  main.append(developmentRow);
+  if (developmentState.nextAction) {
+    const followUp = document.createElement("p");
+    followUp.className = `next-follow-up${developmentState.overdue ? " overdue" : ""}`;
+    followUp.textContent = `${developmentState.overdue ? "已逾期" : "下一步"}：${developmentState.nextAction.note || "跟进客户"} · ${formatMoment(developmentState.nextAction.dueAt)}`;
+    main.append(followUp);
+  }
   if (lead.compliance.duplicateOf) {
     const master = document.createElement("p");
     master.className = "duplicate-master";
@@ -530,22 +823,31 @@ function leadCard(item) {
   caption.textContent = "开发优先分 / 100";
   score.append(number, caption);
 
-  card.append(grade, main, score, evidenceList(lead));
+  card.append(grade, main, score, developmentTimeline(lead, developmentState), evidenceList(lead));
   return card;
 }
 
 function renderLeads() {
   const filter = $("#gradeFilter").value;
+  const developmentFilter = $("#developmentFilter").value;
   const list = $("#leadList");
   list.replaceChildren();
   const results = currentResult.results
+    .map((item) => ({ ...item, developmentState: getDevelopmentState(item.lead) }))
     .filter((item) => filter === "ALL" || item.qualification.grade === filter)
-    .sort((left, right) => right.qualification.score - left.qualification.score);
+    .filter((item) => {
+      if (developmentFilter === "ALL") return true;
+      if (developmentFilter === "FOLLOW_UP") return item.developmentState.openFollowUps.length > 0;
+      if (developmentFilter === "OVERDUE") return item.developmentState.overdue;
+      return item.developmentState.stage === developmentFilter;
+    })
+    .sort((left, right) => Number(right.developmentState.overdue) - Number(left.developmentState.overdue)
+      || right.qualification.score - left.qualification.score);
 
   if (!results.length) {
     const empty = document.createElement("p");
     empty.className = "empty";
-    empty.textContent = "这个等级暂时没有线索。";
+    empty.textContent = "当前筛选条件下没有线索。";
     list.append(empty);
     return;
   }
@@ -576,6 +878,11 @@ async function loadSelectedFile(file) {
 
 function downloadResult() {
   if (!currentResult) return;
+  currentResult.generatedAt = new Date().toISOString();
+  currentResult.developmentSummary = summarizeDevelopment(
+    currentResult.results.map((item) => item.lead),
+    { now: currentResult.generatedAt }
+  );
   downloadJson(currentResult, `Lydia-客户分级-${new Date().toISOString().slice(0, 10)}.json`);
   setStatus("Lydia 分级结果已导出，可在外贸开发插件中导入。", "success");
 }
@@ -1341,6 +1648,7 @@ $("#exportProspects").addEventListener("click", () => {
 
 $("#leadFile").addEventListener("change", (event) => loadSelectedFile(event.target.files[0]));
 $("#gradeFilter").addEventListener("change", renderLeads);
+$("#developmentFilter").addEventListener("change", renderLeads);
 $("#exportResults").addEventListener("click", downloadResult);
 $("#loadSample").addEventListener("click", async () => {
   try {
@@ -1414,4 +1722,10 @@ $("#duplicateReviewForm").addEventListener("submit", applyDuplicateAction);
 $("#cancelDuplicateReview").addEventListener("click", () => {
   pendingDuplicateAction = null;
   $("#duplicateReviewDialog").close();
+});
+
+$("#developmentForm").addEventListener("submit", applyDevelopmentAction);
+$("#cancelDevelopment").addEventListener("click", () => {
+  pendingDevelopmentLeadId = null;
+  $("#developmentDialog").close();
 });

@@ -13,6 +13,15 @@ export {
   listDuplicateDecisions
 } from "./deduplication.mjs";
 export { reviewDuplicatePair } from "./duplicate-review.mjs";
+export {
+  DEVELOPMENT_EVENT_LABELS,
+  DEVELOPMENT_STAGE_LABELS,
+  getDevelopmentState,
+  initializeDevelopmentTracking,
+  recordDevelopmentEvent,
+  summarizeDevelopment,
+  voidDevelopmentEvent
+} from "./development.mjs";
 export { mergeEvidenceIntoLead } from "./enrichment.mjs";
 export { enrichmentFromEvidenceSelection } from "./evidence-selection.mjs";
 export { reviewLeadEvidence, reviseLeadEvidence } from "./evidence-review.mjs";

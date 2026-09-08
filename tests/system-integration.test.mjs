@@ -4,10 +4,14 @@ import { readFile } from "node:fs/promises";
 import {
   SCHEMA_VERSION,
   findDuplicateCandidates,
+  initializeDevelopmentTracking,
   leadsFromCsv,
   listDuplicateDecisions,
+  normalizeLead,
+  recordDevelopmentEvent,
   reviewDuplicatePair,
-  qualifyLead
+  qualifyLead,
+  summarizeDevelopment
 } from "../packages/lead-core/src/index.mjs";
 import {
   createInitialState,
@@ -73,4 +77,44 @@ test("a reviewed master-account relationship reaches the communication extension
   assert.equal(payload.duplicateDecisions[0].decision, "same");
   assert.equal(importedSecondary.leadProfile.grade, "HOLD");
   assert.equal(importedSecondary.leadProfile.inquiryMessage, "Need the updated catalog for our next range.");
+});
+
+test("schema 4 preserves the development baseline and timeline while remaining compatible with the communication extension", async () => {
+  const csv = await readFile(new URL("../examples/inquiries.sample.csv", import.meta.url), "utf8");
+  const leads = initializeDevelopmentTracking(leadsFromCsv(csv), {
+    capturedAt: "2026-09-08T01:00:00.000Z"
+  });
+  const first = leads[0];
+  const contacted = recordDevelopmentEvent(first, {
+    type: "contact-attempted",
+    channel: "email",
+    note: "Sent a product-specific introduction"
+  }, { now: "2026-09-08T02:00:00.000Z" }).lead;
+  const replied = recordDevelopmentEvent(contacted, {
+    type: "buyer-replied",
+    channel: "email",
+    note: "Buyer requested a formal quote"
+  }, { now: "2026-09-08T03:00:00.000Z" }).lead;
+  const updatedLeads = [replied, ...leads.slice(1)];
+  const payload = JSON.parse(JSON.stringify({
+    format: "lydia-qualified-leads",
+    schemaVersion: SCHEMA_VERSION,
+    product: "Lydia 外贸系统",
+    generatedAt: "2026-09-08T04:00:00.000Z",
+    sourceFile: "inquiries.sample.csv",
+    developmentSummary: summarizeDevelopment(updatedLeads, { now: "2026-09-08T04:00:00.000Z" }),
+    results: updatedLeads.map((lead) => ({ lead, qualification: qualifyLead(lead) }))
+  }));
+
+  const roundTripped = normalizeLead(payload.results[0].lead);
+  assert.equal(payload.schemaVersion, 4);
+  assert.equal(roundTripped.development.qualificationBaseline.grade, "B");
+  assert.deepEqual(roundTripped.development.events.map((event) => event.type), ["contact-attempted", "buyer-replied"]);
+  assert.equal(payload.developmentSummary.totals.replied, 1);
+
+  const imported = importQualifiedLeads(payload, createInitialState(), "2026-09-08T04:01:00.000Z");
+  const customer = imported.state.customers.find((item) => item.company === "Northstar Demo Imports");
+  assert.equal(imported.importedCount, 4);
+  assert.equal(customer.leadProfile.grade, "B");
+  assert.equal(customer.leadProfile.inquiryMessage, "Please quote 2,000 units, FOB Shanghai.");
 });

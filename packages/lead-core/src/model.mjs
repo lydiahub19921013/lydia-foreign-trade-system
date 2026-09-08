@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const EVIDENCE_STATUSES = new Set([
   "candidate",
@@ -10,6 +10,29 @@ const EVIDENCE_STATUSES = new Set([
 const REVIEW_ACTIONS = new Set(["accepted", "rejected", "revised"]);
 const REVIEW_DECISIONS = new Set(["accepted", "rejected"]);
 const DUPLICATE_REVIEW_DECISIONS = new Set(["same", "distinct", "reopened"]);
+const DEVELOPMENT_EVENT_TYPES = new Set([
+  "contact-attempted",
+  "buyer-replied",
+  "quote-sent",
+  "sample-sent",
+  "order-received",
+  "won",
+  "lost",
+  "reopened",
+  "follow-up-scheduled",
+  "follow-up-completed",
+  "note",
+  "activity-voided"
+]);
+const DEVELOPMENT_CHANNELS = new Set([
+  "platform",
+  "email",
+  "whatsapp",
+  "phone",
+  "meeting",
+  "other"
+]);
+const QUALIFICATION_GRADES = new Set(["A", "B", "C", "D", "HOLD"]);
 const LEAD_FIELD_PATHS = new Set([
   "organization.name",
   "organization.domain",
@@ -157,6 +180,69 @@ function normalizeDuplicateReview(input = {}) {
   };
 }
 
+function normalizeQualificationBaseline(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  const grade = clean(input.grade).toUpperCase();
+  const score = Number(input.score);
+  const capturedAt = isoDate(input.capturedAt);
+  if (!QUALIFICATION_GRADES.has(grade) || !Number.isFinite(score) || !capturedAt) return null;
+  return {
+    grade,
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    capturedAt
+  };
+}
+
+function normalizeDevelopmentEvent(input = {}) {
+  if (!input || typeof input !== "object" || !DEVELOPMENT_EVENT_TYPES.has(input.type)) return null;
+  const occurredAt = isoDate(input.occurredAt);
+  const dueAt = isoDate(input.dueAt);
+  const relatedEventId = boundedText(input.relatedEventId, 160) || null;
+  if (!occurredAt) return null;
+  if (input.type === "follow-up-scheduled" && !dueAt) return null;
+  if (["follow-up-completed", "activity-voided"].includes(input.type) && !relatedEventId) return null;
+  const channel = DEVELOPMENT_CHANNELS.has(input.channel) ? input.channel : null;
+  const amount = input.amount === null || input.amount === undefined || input.amount === ""
+    ? null
+    : Number(input.amount);
+  const normalized = {
+    id: boundedText(input.id, 160) || null,
+    type: input.type,
+    occurredAt,
+    channel,
+    note: boundedText(input.note, 1000) || null,
+    dueAt,
+    relatedEventId,
+    amount: amount !== null && Number.isFinite(amount) && amount >= 0 ? amount : null,
+    currency: /^[A-Z]{3}$/u.test(clean(input.currency).toUpperCase())
+      ? clean(input.currency).toUpperCase()
+      : null,
+    outcomeReason: boundedText(input.outcomeReason, 120) || null
+  };
+  normalized.id ||= `dev_${stableDigest(JSON.stringify([
+    normalized.type,
+    normalized.occurredAt,
+    normalized.channel,
+    normalized.dueAt,
+    normalized.relatedEventId,
+    normalized.note,
+    normalized.amount,
+    normalized.currency
+  ])).slice(0, 12)}`;
+  return normalized;
+}
+
+function normalizeDevelopment(input = {}) {
+  const development = input && typeof input === "object" ? input : {};
+  return {
+    qualificationBaseline: normalizeQualificationBaseline(development.qualificationBaseline),
+    events: (Array.isArray(development.events) ? development.events : [])
+      .map(normalizeDevelopmentEvent)
+      .filter(Boolean)
+      .slice(-500)
+  };
+}
+
 export function createEvidence(input = {}) {
   const status = EVIDENCE_STATUSES.has(input.status)
     ? input.status
@@ -238,6 +324,7 @@ export function normalizeLead(input = {}) {
       .map(normalizeDuplicateReview)
       .filter(Boolean)
       .slice(-100),
+    development: normalizeDevelopment(input.development),
     compliance: {
       doNotContact: bool(compliance.doNotContact),
       restrictedMarket: bool(compliance.restrictedMarket),

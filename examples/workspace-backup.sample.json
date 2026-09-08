@@ -1,0 +1,59 @@
+{
+  "format": "lydia-workspace-backup",
+  "schemaVersion": 1,
+  "exportedAt": "2026-09-08T12:00:00.000Z",
+  "workspace": {
+    "format": "lydia-workspace-reference",
+    "schemaVersion": 1,
+    "id": "ws_fictional_backup",
+    "name": "虚构备份客户 · 礼品",
+    "exportedAt": "2026-09-08T12:00:00.000Z"
+  },
+  "snapshot": {
+    "format": "lydia-workbench-snapshot",
+    "schemaVersion": 1,
+    "savedAt": "2026-09-08T12:00:00.000Z",
+    "state": {
+      "currentRelationshipResult": {
+        "format": "lydia-relationship-paths",
+        "schemaVersion": 1,
+        "product": "Lydia 外贸系统",
+        "generatedAt": "2026-09-08T12:00:00.000Z",
+        "sourceFile": "workspace-backup.sample.json",
+        "inputCount": 1,
+        "excludedDeclinedCount": 0,
+        "paths": [
+          {
+            "connectorId": "connector-demo-backup",
+            "connectorName": "林示例",
+            "targetId": "target-demo-backup",
+            "targetName": "Northstar Demo Imports",
+            "relationshipStrength": 5,
+            "lastContactAt": "2026-08-28T08:00:00.000Z",
+            "knowsTarget": true,
+            "sharedEmployer": true,
+            "sharedIndustry": true,
+            "sharedEducation": false,
+            "consentStatus": "approved",
+            "evidenceIds": [
+              "crm-demo-backup"
+            ],
+            "score": 95,
+            "reasons": [
+              "关系强度 5/5",
+              "近期有联系",
+              "确认彼此认识",
+              "有共同公司经历",
+              "有共同从业背景",
+              "已同意协助"
+            ],
+            "nextAction": "由关系人自行决定何时、以何种方式完成介绍"
+          }
+        ]
+      },
+      "ui": {
+        "channel": "made-in-china"
+      }
+    }
+  }
+}

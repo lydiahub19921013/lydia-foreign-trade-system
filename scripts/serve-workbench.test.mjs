@@ -23,6 +23,8 @@ test("workbench server serves the local UI and browser-safe core", async () => {
     assert.match(html, /Lydia 外贸系统/);
     assert.match(html, /本机自动保存/);
     assert.match(html, /新建客户空间/);
+    assert.match(html, /导出完整备份/);
+    assert.match(html, /恢复完整备份/);
     assert.match(html, /\/apps\/lead-workbench\/app\.mjs/);
 
     const stylesheet = await fetch(`${origin}/apps/lead-workbench/styles.css`);
@@ -38,6 +40,11 @@ test("workbench server serves the local UI and browser-safe core", async () => {
     const persistenceSource = await persistence.text();
     assert.match(persistenceSource, /lydia-workbench-snapshot/);
     assert.match(persistenceSource, /lydia-workspace-index/);
+    assert.match(persistenceSource, /lydia-workspace-backup/);
+
+    const backupExample = await fetch(`${origin}/examples/workspace-backup.sample.json`);
+    assert.equal(backupExample.status, 200);
+    assert.equal((await backupExample.json()).format, "lydia-workspace-backup");
   });
 });
 

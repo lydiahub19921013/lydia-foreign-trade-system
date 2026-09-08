@@ -3,6 +3,8 @@ export const WORKBENCH_SNAPSHOT_SCHEMA_VERSION = 1;
 export const WORKSPACE_INDEX_FORMAT = "lydia-workspace-index";
 export const WORKSPACE_INDEX_SCHEMA_VERSION = 1;
 export const WORKSPACE_REFERENCE_FORMAT = "lydia-workspace-reference";
+export const WORKSPACE_BACKUP_FORMAT = "lydia-workspace-backup";
+export const WORKSPACE_BACKUP_SCHEMA_VERSION = 1;
 export const DEFAULT_WORKSPACE_NAME = "我的客户 1";
 export const PERSISTED_UI_FIELD_IDS = Object.freeze([
   "channel",
@@ -28,6 +30,7 @@ const LEGACY_SNAPSHOT_KEY = "current";
 const WORKSPACE_INDEX_KEY = "workspace-index";
 const LEGACY_WORKSPACE_ID = "ws_legacy_current";
 const MAX_WORKSPACES = 50;
+const SENSITIVE_STATE_KEY = /(?:api.?key|secret|token|password|authorization|cookie)/iu;
 const PERSISTED_STATE_FIELDS = [
   "currentResult",
   "currentProspectPlan",
@@ -47,6 +50,24 @@ function clone(value) {
   return typeof structuredClone === "function"
     ? structuredClone(value)
     : JSON.parse(JSON.stringify(value));
+}
+
+function clonePersistable(value, ancestors = new Set()) {
+  if (value === null || typeof value !== "object") return value;
+  if (ancestors.has(value)) throw new Error("工作台状态不能包含循环引用");
+  ancestors.add(value);
+  let result;
+  if (Array.isArray(value)) {
+    result = value.map((item) => clonePersistable(item, ancestors));
+  } else {
+    result = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (SENSITIVE_STATE_KEY.test(key)) continue;
+      result[key] = clonePersistable(item, ancestors);
+    }
+  }
+  ancestors.delete(value);
+  return result;
 }
 
 function normalizedDate(value, field) {
@@ -81,7 +102,7 @@ function normalizeWorkspace(input) {
 
 function persistenceState(input) {
   const state = {};
-  for (const field of PERSISTED_STATE_FIELDS) state[field] = clone(input[field] ?? null);
+  for (const field of PERSISTED_STATE_FIELDS) state[field] = clonePersistable(input[field] ?? null);
   state.selectedWebsiteEvidenceIds = (Array.isArray(input.selectedWebsiteEvidenceIds)
     ? input.selectedWebsiteEvidenceIds
     : [])
@@ -165,15 +186,85 @@ export function normalizeWorkspaceIndex(input) {
   };
 }
 
-export function createWorkspaceReference(workspace, options = {}) {
-  if (!isObject(workspace)) throw new Error("当前客户空间格式不正确");
+export function normalizeWorkspaceReference(input) {
+  if (!isObject(input) || input.format !== WORKSPACE_REFERENCE_FORMAT) {
+    throw new Error("客户空间标记格式不正确");
+  }
+  const schemaVersion = Number(input.schemaVersion);
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    throw new Error("客户空间标记缺少有效版本");
+  }
+  if (schemaVersion > 1) throw new Error("客户空间标记来自更新版本，请先升级 Lydia 外贸系统");
   return {
     format: WORKSPACE_REFERENCE_FORMAT,
-    schemaVersion: 1,
-    id: normalizeWorkspaceId(workspace.id),
-    name: normalizeWorkspaceName(workspace.name),
-    exportedAt: normalizedDate(options.exportedAt || Date.now(), "客户空间导出时间")
+    schemaVersion,
+    id: normalizeWorkspaceId(input.id),
+    name: normalizeWorkspaceName(input.name),
+    exportedAt: normalizedDate(input.exportedAt, "客户空间导出时间")
   };
+}
+
+export function createWorkspaceReference(workspace, options = {}) {
+  if (!isObject(workspace)) throw new Error("当前客户空间格式不正确");
+  return normalizeWorkspaceReference({
+    format: WORKSPACE_REFERENCE_FORMAT,
+    schemaVersion: 1,
+    id: workspace.id,
+    name: workspace.name,
+    exportedAt: options.exportedAt || Date.now()
+  });
+}
+
+export function createWorkspaceBackup(workspace, state, options = {}) {
+  if (!isObject(state)) throw new Error("工作台状态格式不正确");
+  const exportedAt = normalizedDate(options.exportedAt || Date.now(), "客户空间备份时间");
+  return {
+    format: WORKSPACE_BACKUP_FORMAT,
+    schemaVersion: WORKSPACE_BACKUP_SCHEMA_VERSION,
+    exportedAt,
+    workspace: createWorkspaceReference(workspace, { exportedAt }),
+    snapshot: createWorkbenchSnapshot(state, { savedAt: exportedAt })
+  };
+}
+
+export function normalizeWorkspaceBackup(input) {
+  if (!isObject(input) || input.format !== WORKSPACE_BACKUP_FORMAT) {
+    throw new Error("请选择 Lydia 完整客户空间备份 JSON");
+  }
+  const schemaVersion = Number(input.schemaVersion);
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1) {
+    throw new Error("客户空间备份缺少有效版本");
+  }
+  if (schemaVersion > WORKSPACE_BACKUP_SCHEMA_VERSION) {
+    throw new Error("客户空间备份来自更新版本，请先升级 Lydia 外贸系统");
+  }
+  return {
+    format: WORKSPACE_BACKUP_FORMAT,
+    schemaVersion,
+    exportedAt: normalizedDate(input.exportedAt, "客户空间备份时间"),
+    workspace: normalizeWorkspaceReference(input.workspace),
+    snapshot: normalizeWorkbenchSnapshot(input.snapshot)
+  };
+}
+
+export function createRestoredWorkspaceName(sourceName, workspaces = []) {
+  const name = normalizeWorkspaceName(sourceName);
+  const existing = new Set((Array.isArray(workspaces) ? workspaces : [])
+    .map((workspace) => {
+      try {
+        return normalizeWorkspaceName(workspace?.name).toLocaleLowerCase("zh-CN");
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean));
+  if (!existing.has(name.toLocaleLowerCase("zh-CN"))) return name;
+  for (let number = 1; number <= MAX_WORKSPACES; number += 1) {
+    const suffix = number === 1 ? " · 恢复" : ` · 恢复 ${number}`;
+    const candidate = `${name.slice(0, Math.max(1, 60 - suffix.length))}${suffix}`;
+    if (!existing.has(candidate.toLocaleLowerCase("zh-CN"))) return candidate;
+  }
+  throw new Error("无法为恢复的客户空间生成唯一名称");
 }
 
 export function assertPayloadMatchesWorkspace(payload, activeWorkspace) {
@@ -181,8 +272,9 @@ export function assertPayloadMatchesWorkspace(payload, activeWorkspace) {
   if (!isObject(activeWorkspace)) throw new Error("当前客户空间还没有准备好");
   const activeId = normalizeWorkspaceId(activeWorkspace.id);
   const activeName = normalizeWorkspaceName(activeWorkspace.name);
-  const sourceId = normalizeWorkspaceId(payload.workspace.id);
-  const sourceName = normalizeWorkspaceName(payload.workspace.name);
+  const reference = normalizeWorkspaceReference(payload.workspace);
+  const sourceId = reference.id;
+  const sourceName = reference.name;
   const sameId = sourceId === activeId;
   const sameName = sourceName.toLocaleLowerCase("zh-CN") === activeName.toLocaleLowerCase("zh-CN");
   if (sameId || sameName) return;
@@ -370,6 +462,37 @@ export function createIndexedDbPersistence(indexedDb, options = {}) {
     });
   }
 
+  async function restoreWorkspaceBackup(input) {
+    const backup = normalizeWorkspaceBackup(input);
+    const index = await initializeWorkspaces();
+    if (index.workspaces.length >= MAX_WORKSPACES) {
+      throw new Error(`客户空间不能超过 ${MAX_WORKSPACES} 个`);
+    }
+    const name = createRestoredWorkspaceName(backup.workspace.name, index.workspaces);
+    let id = createWorkspaceId(idFactory);
+    while (index.workspaces.some((workspace) => workspace.id === id)) id = createWorkspaceId(idFactory);
+    const timestamp = new Date().toISOString();
+    const workspace = { id, name, createdAt: timestamp, updatedAt: timestamp };
+    const nextIndex = normalizeWorkspaceIndex({
+      ...index,
+      activeWorkspaceId: id,
+      workspaces: [...index.workspaces, workspace]
+    });
+
+    await writeEntry(workspaceSnapshotKey(id), backup.snapshot);
+    try {
+      const savedIndex = await saveWorkspaceIndex(nextIndex);
+      return { index: savedIndex, workspace, backup };
+    } catch (error) {
+      try {
+        await deleteEntry(workspaceSnapshotKey(id));
+      } catch {
+        // The orphaned key is not referenced by the workspace index and cannot be loaded by the UI.
+      }
+      throw error;
+    }
+  }
+
   async function renameWorkspace(workspaceId, name) {
     const id = normalizeWorkspaceId(workspaceId);
     const normalizedName = normalizeWorkspaceName(name);
@@ -413,6 +536,7 @@ export function createIndexedDbPersistence(indexedDb, options = {}) {
     saveWorkspace,
     clearWorkspace,
     createWorkspace,
+    restoreWorkspaceBackup,
     renameWorkspace,
     setActiveWorkspace,
     deleteWorkspace

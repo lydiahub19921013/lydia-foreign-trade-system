@@ -35,6 +35,7 @@ import {
   PERSISTED_UI_FIELD_IDS,
   assertPayloadMatchesWorkspace,
   createIndexedDbPersistence,
+  createWorkspaceBackup,
   createWorkspaceFilename,
   createWorkspaceReference,
   createWorkbenchSnapshot
@@ -122,6 +123,8 @@ function renderWorkspaceControls() {
   $("#renameWorkspace").disabled = !activeWorkspace;
   $("#deleteWorkspace").disabled = !activeWorkspace || workspaceIndex.workspaces.length <= 1;
   $("#createWorkspace").disabled = !workspaceIndex;
+  $("#exportWorkspaceBackup").disabled = !activeWorkspace;
+  $("#restoreWorkspaceBackup").disabled = !activeWorkspace;
 }
 
 async function drainPersistence() {
@@ -304,7 +307,7 @@ async function initializePersistence() {
     const snapshot = await workbenchPersistence.loadWorkspace(activeWorkspace.id);
     if (snapshot && !persistenceDirtyBeforeReady) restoreWorkbenchSnapshot(snapshot);
     persistenceReady = true;
-    workspaceMessage(`当前只显示“${activeWorkspace.name}”的数据；切换空间会先保存再重新载入。`, "success");
+    workspaceMessage(`当前只显示“${activeWorkspace.name}”的数据；切换前先保存，完整备份恢复时新建空间。`, "success");
     if (snapshot) {
       $("#clearLocalData").disabled = false;
       if (!currentResult && !currentProspectResult && !currentRelationshipResult) {
@@ -322,6 +325,8 @@ async function initializePersistence() {
     $("#createWorkspace").disabled = true;
     $("#renameWorkspace").disabled = true;
     $("#deleteWorkspace").disabled = true;
+    $("#exportWorkspaceBackup").disabled = true;
+    $("#restoreWorkspaceBackup").disabled = true;
     $("#clearLocalData").disabled = !workbenchPersistence || !activeWorkspace;
     const recovery = workbenchPersistence
       ? "请先导出已有数据；不要切换客户空间。"
@@ -1137,6 +1142,7 @@ function workspaceFilename(label) {
 
 function payloadWithWorkspace(payload) {
   if (!payload || typeof payload !== "object" || Array.isArray(payload) || !activeWorkspace) return payload;
+  if (payload.format === "lydia-workspace-backup") return payload;
   return {
     ...payload,
     workspace: createWorkspaceReference(activeWorkspace)
@@ -1149,8 +1155,10 @@ function downloadJson(payload, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function fact(label, value) {
@@ -2025,6 +2033,44 @@ $("#cancelDevelopment").addEventListener("click", () => {
 for (const id of PERSISTED_UI_FIELD_IDS.filter((field) => !["gradeFilter", "developmentFilter"].includes(field))) {
   $(`#${id}`).addEventListener("change", schedulePersistence);
 }
+
+$("#exportWorkspaceBackup").addEventListener("click", async () => {
+  const button = $("#exportWorkspaceBackup");
+  button.disabled = true;
+  workspaceMessage(`正在整理“${activeWorkspace.name}”的完整备份……`);
+  try {
+    await flushCurrentWorkspace();
+    const backup = createWorkspaceBackup(activeWorkspace, workbenchStateForPersistence());
+    downloadJson(backup, workspaceFilename("完整空间备份"));
+    workspaceMessage(`“${activeWorkspace.name}”完整备份已下载；文件未上传。`, "success");
+  } catch (error) {
+    workspaceMessage(error.message || "完整空间备份失败。", "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#restoreWorkspaceBackup").addEventListener("click", () => $("#restoreWorkspaceFile").click());
+$("#restoreWorkspaceFile").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const button = $("#restoreWorkspaceBackup");
+  button.disabled = true;
+  workspaceMessage(`正在检查并恢复 ${file.name}……`);
+  try {
+    if (file.size > 25 * 1024 * 1024) throw new Error("客户空间备份不能超过 25 MB");
+    const payload = JSON.parse(await file.text());
+    await flushCurrentWorkspace();
+    const restored = await workbenchPersistence.restoreWorkspaceBackup(payload);
+    workspaceMessage(`已恢复为新空间“${restored.workspace.name}”，正在载入……`, "success");
+    window.location.reload();
+  } catch (error) {
+    workspaceMessage(error.message || "客户空间备份恢复失败。", "error");
+    button.disabled = false;
+  } finally {
+    event.target.value = "";
+  }
+});
 
 function openWorkspaceDialog(mode) {
   workspaceDialogMode = mode;

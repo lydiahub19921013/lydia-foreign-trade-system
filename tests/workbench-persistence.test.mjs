@@ -1,15 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   DEFAULT_WORKSPACE_NAME,
   WORKBENCH_SNAPSHOT_FORMAT,
+  WORKSPACE_BACKUP_FORMAT,
   WORKSPACE_INDEX_FORMAT,
   assertPayloadMatchesWorkspace,
   createIndexedDbPersistence,
+  createRestoredWorkspaceName,
   createWorkbenchSnapshot,
+  createWorkspaceBackup,
   createWorkspaceFilename,
   createWorkspaceReference,
   normalizeWorkbenchSnapshot,
+  normalizeWorkspaceBackup,
   normalizeWorkspaceIndex,
   normalizeWorkspaceName
 } from "../apps/lead-workbench/persistence.mjs";
@@ -68,7 +73,13 @@ function fakeIndexedDb() {
 
 test("workbench snapshots are versioned and detached from live state", () => {
   const state = {
-    currentResult: { count: 1 },
+    currentResult: {
+      count: 1,
+      providerMetadata: {
+        apiKey: "must-not-persist",
+        label: "safe"
+      }
+    },
     selectedWebsiteEvidenceIds: ["evidence-1"],
     apiKey: "must-not-persist",
     ui: {
@@ -84,11 +95,18 @@ test("workbench snapshots are versioned and detached from live state", () => {
   assert.equal(snapshot.schemaVersion, 1);
   assert.equal(snapshot.savedAt, "2026-09-08T08:00:00.000Z");
   assert.equal(snapshot.state.currentResult.count, 1);
+  assert.deepEqual(snapshot.state.currentResult.providerMetadata, { label: "safe" });
   assert.equal(snapshot.state.ui.channel, "alibaba");
   assert.equal("apiKey" in snapshot.state, false);
   assert.equal("prospectSearchConfirmed" in snapshot.state.ui, false);
   assert.equal("websiteConfirmed" in snapshot.state.ui, false);
   assert.equal(JSON.stringify(snapshot).includes("must-not-persist"), false);
+});
+
+test("workbench snapshots reject cyclic state instead of silently producing a broken backup", () => {
+  const cyclic = { count: 1 };
+  cyclic.self = cyclic;
+  assert.throws(() => createWorkbenchSnapshot({ currentResult: cyclic }), /循环引用/);
 });
 
 test("snapshot normalization rejects corrupt and future data", () => {
@@ -153,6 +171,58 @@ test("exports carry a customer-space marker and mismatched imports fail closed",
     workspace: { ...reference, id: "ws_other", name: "客户 B" }
   }, workspace), /防止串客户/);
   assert.doesNotThrow(() => assertPayloadMatchesWorkspace({ results: [] }, workspace));
+});
+
+test("full workspace backups are versioned, whitelisted and detached", () => {
+  const state = {
+    currentResult: { count: 4 },
+    currentRelationshipResult: {
+      paths: [{
+        id: "path-1",
+        evidence: { authorization: "must-not-persist", note: "safe" }
+      }]
+    },
+    selectedWebsiteEvidenceIds: ["evidence-1"],
+    secretToken: "must-not-persist",
+    ui: {
+      channel: "alibaba",
+      prospectSearchConfirmed: "true",
+      apiKey: "must-not-persist"
+    }
+  };
+  const workspace = { id: "ws_test_one", name: "客户 A" };
+  const backup = createWorkspaceBackup(workspace, state, { exportedAt: "2026-09-08T11:00:00.000Z" });
+  state.currentResult.count = 99;
+  assert.equal(backup.format, WORKSPACE_BACKUP_FORMAT);
+  assert.equal(backup.schemaVersion, 1);
+  assert.equal(backup.workspace.name, "客户 A");
+  assert.equal(backup.snapshot.state.currentResult.count, 4);
+  assert.deepEqual(backup.snapshot.state.currentRelationshipResult.paths[0].evidence, { note: "safe" });
+  assert.equal(backup.snapshot.state.ui.channel, "alibaba");
+  assert.equal(JSON.stringify(backup).includes("must-not-persist"), false);
+  assert.equal("prospectSearchConfirmed" in backup.snapshot.state.ui, false);
+  assert.deepEqual(normalizeWorkspaceBackup(backup), backup);
+  assert.throws(() => normalizeWorkspaceBackup({}), /完整客户空间备份/);
+  assert.throws(() => normalizeWorkspaceBackup({ ...backup, schemaVersion: 2 }), /更新版本/);
+});
+
+test("fictional full-backup example remains importable", async () => {
+  const payload = JSON.parse(await readFile(new URL("../examples/workspace-backup.sample.json", import.meta.url), "utf8"));
+  const backup = normalizeWorkspaceBackup(payload);
+  assert.equal(backup.workspace.name, "虚构备份客户 · 礼品");
+  assert.equal(backup.snapshot.state.currentRelationshipResult.paths.length, 1);
+  assert.equal(backup.snapshot.state.ui.channel, "made-in-china");
+});
+
+test("restored workspace names never overwrite an existing customer", () => {
+  assert.equal(createRestoredWorkspaceName("客户 A", [{ name: "客户 B" }]), "客户 A");
+  assert.equal(createRestoredWorkspaceName("客户 A", [{ name: "客户 A" }]), "客户 A · 恢复");
+  assert.equal(createRestoredWorkspaceName("客户 A", [
+    { name: "客户 A" },
+    { name: "客户 A · 恢复" }
+  ]), "客户 A · 恢复 2");
+  const longName = "客".repeat(60);
+  assert.equal(createRestoredWorkspaceName(longName, [{ name: longName }]).length, 60);
 });
 
 test("legacy current snapshot migrates into the first isolated workspace", async () => {
@@ -220,4 +290,40 @@ test("IndexedDB keeps customer workspaces separate and clears only the selected 
   assert.equal(afterDelete.workspaces.length, 1);
   assert.equal(afterDelete.activeWorkspaceId, firstId);
   await assert.rejects(() => persistence.deleteWorkspace(firstId), /至少保留/);
+});
+
+test("restoring a full backup creates a new isolated workspace without overwriting the current one", async () => {
+  let id = 0;
+  const persistence = createIndexedDbPersistence(fakeIndexedDb(), {
+    databaseName: "test-lydia-restore",
+    storeName: "snapshots",
+    idFactory: () => `restore_${++id}`
+  });
+  let index = await persistence.initializeWorkspaces();
+  const originalId = index.activeWorkspaceId;
+  index = await persistence.renameWorkspace(originalId, "客户 A");
+  const originalSnapshot = createWorkbenchSnapshot({
+    currentResult: { count: 4, customer: "original" }
+  }, { savedAt: "2026-09-08T11:00:00.000Z" });
+  await persistence.saveWorkspace(originalId, originalSnapshot);
+
+  const backup = createWorkspaceBackup({ id: "ws_source_backup", name: "客户 A" }, {
+    currentResult: { count: 9, customer: "restored" },
+    currentRelationshipResult: { paths: [{ id: "path-1" }] },
+    ui: { channel: "made-in-china", websiteConfirmed: "true" }
+  }, { exportedAt: "2026-09-08T12:00:00.000Z" });
+  const restored = await persistence.restoreWorkspaceBackup(backup);
+  assert.equal(restored.workspace.name, "客户 A · 恢复");
+  assert.equal(restored.index.activeWorkspaceId, restored.workspace.id);
+  assert.equal(restored.index.workspaces.length, 2);
+  assert.deepEqual(await persistence.loadWorkspace(originalId), originalSnapshot);
+  const restoredSnapshot = await persistence.loadWorkspace(restored.workspace.id);
+  assert.equal(restoredSnapshot.state.currentResult.count, 9);
+  assert.equal(restoredSnapshot.state.currentRelationshipResult.paths.length, 1);
+  assert.equal(restoredSnapshot.state.ui.channel, "made-in-china");
+  assert.equal("websiteConfirmed" in restoredSnapshot.state.ui, false);
+
+  const secondRestore = await persistence.restoreWorkspaceBackup(backup);
+  assert.equal(secondRestore.workspace.name, "客户 A · 恢复 2");
+  assert.equal(secondRestore.index.workspaces.length, 3);
 });

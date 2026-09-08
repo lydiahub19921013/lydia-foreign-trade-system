@@ -29,6 +29,13 @@ npm run check
 - `integrations`：可选研究/验证适配器；只有明确配置后才启用。
 - `skills/lydia-foreign-trade-system`：供 Codex 复用的 Lydia 工作流 Skill。
 
+沟通插件仍保留自己的独立私有仓库，并以 Git subtree 纳入本系统。需要同步其新版本时，在系统仓库执行：
+
+```bash
+git subtree pull --prefix apps/communication-extension \
+  https://github.com/lydiahub19921013/foreign-trade-development-plugin.git main --squash
+```
+
 公开资料只能作为线索和证据，不能冒充已确认事实；候选邮箱不能写成“已验证邮箱”。系统不按姓名、国籍、性别等敏感或无关属性判断客户质量。
 
 ## 品牌与授权

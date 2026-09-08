@@ -11,6 +11,8 @@
     "qualify": "node apps/inquiry-qualifier/cli.mjs",
     "test": "node --test packages/lead-core/tests/*.test.mjs integrations/email-sleuth/*.test.mjs",
     "verify": "node scripts/verify-system.mjs",
-    "check": "npm run test && npm run verify"
+    "check:core": "npm run test && npm run verify",
+    "check:extension": "npm --prefix apps/communication-extension run check",
+    "check": "npm run check:core && npm run check:extension"
   }
 }

@@ -1,0 +1,38 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.9.0",
+    "sourceCommit": "b3a8356f3378a76e79f6d8b66520ec38f76cab4b",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "evidenceReview": {
+    "schemaVersion": 2,
+    "rejectRestoreReviseAvailable": true,
+    "reviewReasonRequired": true,
+    "fieldOriginsRecorded": true,
+    "safeRollbackVerified": true,
+    "manualFieldEditsPreserved": true,
+    "rejectedEvidenceExcludedFromScoring": true,
+    "unselectedWebsiteFieldsBlocked": true
+  },
+  "verification": {
+    "systemTests": 82,
+    "extensionTests": 24,
+    "scannedTextFiles": 139,
+    "browserQaUsedFictionalDataOnly": true,
+    "coreJsonRoundTripVerified": true,
+    "browserFilePickerReimportVerified": false
+  },
+  "verifiedAt": "2026-09-08T13:53:50+08:00"
+}

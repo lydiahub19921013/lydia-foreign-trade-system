@@ -1,0 +1,63 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.14.0",
+    "sourceCommit": "a335b8ee548d53859289b83e5dc8a3d694d17472",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "localPersistence": {
+    "snapshotFormat": "lydia-workbench-snapshot",
+    "snapshotSchemaVersion": 1,
+    "workspaceIndexFormat": "lydia-workspace-index",
+    "workspaceIndexSchemaVersion": 1,
+    "workspaceReferenceFormat": "lydia-workspace-reference",
+    "workspaceBackupFormat": "lydia-workspace-backup",
+    "workspaceBackupSchemaVersion": 1,
+    "workspaceBackupMaxBytes": 26214400,
+    "storage": "IndexedDB",
+    "databaseName": "lydia-foreign-trade-system",
+    "storeName": "workbench-snapshots",
+    "origin": "http://127.0.0.1:4173",
+    "localWorkspaceIsolationEnabled": true,
+    "workspaceMarkedJsonExportEnabled": true,
+    "crossWorkspaceMarkedJsonImportBlocked": true,
+    "fullWorkspaceBackupEnabled": true,
+    "backupRestoreAlwaysCreatesNewWorkspace": true,
+    "stateWhitelistEnabled": true,
+    "uiWhitelistEnabled": true,
+    "sensitiveNamedKeyScrubEnabled": true,
+    "contentLevelSecretDetectionEnabled": false,
+    "consentConfirmationPersisted": false,
+    "applicationEncryptionEnabled": false,
+    "crossDeviceSyncEnabled": false,
+    "serverTenantAuthorizationEnabled": false
+  },
+  "verification": {
+    "systemTests": 117,
+    "extensionTests": 24,
+    "scannedTextFiles": 175,
+    "moduleBackupRoundTripVerified": true,
+    "fictionalBackupExampleVerified": true,
+    "browserQaUsedFictionalDataOnly": true,
+    "browserBackupControlsVisible": true,
+    "browserExportButtonAndStatusVerified": true,
+    "browserDownloadEventVerified": false,
+    "browserBackupRestoreFileImportVerified": false,
+    "browserVisualQaVerified": true,
+    "browserClosedAndReopenedVerified": false,
+    "browserQuotaFailureVerified": false,
+    "realCustomerDataUsed": false
+  },
+  "verifiedAt": "2026-09-08T16:52:37+08:00"
+}

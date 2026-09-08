@@ -1,0 +1,25 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.4.0",
+    "sourceCommit": "c4397281bbbc7bf4e96a140c6ad8cf93a0c54ec1",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.2.0",
+    "sourceCommit": "2fc0024530f665784bc50af2353842d793b8eebf",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.2.0-chrome.zip",
+    "sha256": "74958d0ad272a7699224e292d5521f9c06b9d801407106b9940a560e4a9e5c89",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "publicWebsiteEvidence": {
+    "singlePageOnly": true,
+    "allResultsCandidate": true,
+    "livePageVerified": true,
+    "manualLeadMergeVerified": true
+  },
+  "verifiedAt": "2026-09-08T11:34:48+08:00"
+}

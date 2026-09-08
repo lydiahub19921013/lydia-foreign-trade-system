@@ -134,6 +134,37 @@ test("workbench server requires confirmation before reading one public website p
   });
 });
 
+test("workbench server requires confirmation and caps the public website dossier", async () => {
+  const calls = [];
+  await withServer(async (origin) => {
+    const missingConsent = await fetch(`${origin}/api/website/dossier?url=https%3A%2F%2Fexample.com`);
+    assert.equal(missingConsent.status, 400);
+    assert.match((await missingConsent.json()).error, /确认/);
+
+    const response = await fetch(`${origin}/api/website/dossier?confirmed=true&url=https%3A%2F%2Fexample.com`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).provider, "public-website-dossier");
+    assert.deepEqual(calls, [{ url: "https://example.com", options: { maxPages: 5 } }]);
+  }, {
+    websiteDossier: async (url, options) => {
+      calls.push({ url, options });
+      return { provider: "public-website-dossier", finalUrl: url, pageCount: 1, evidence: [] };
+    }
+  });
+});
+
+test("workbench server hides unexpected website dossier failures", async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/website/dossier?confirmed=true&url=https%3A%2F%2Fexample.com`);
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { error: "官网档案暂时无法整理，请检查网址或改用单页补证。" });
+  }, {
+    websiteDossier: async () => {
+      throw new Error("private provider detail");
+    }
+  });
+});
+
 test("workbench server does not expose website provider failures", async () => {
   await withServer(async (origin) => {
     const blocked = await fetch(`${origin}/api/website/snapshot?confirmed=true&url=http%3A%2F%2F127.0.0.1`);

@@ -181,6 +181,17 @@ function hrefValues(html, scheme) {
   });
 }
 
+const assetLikeEmailTlds = new Set(["css", "gif", "ico", "jpeg", "jpg", "js", "png", "svg", "webp"]);
+
+function normalizePublicEmail(value) {
+  const email = clean(value, 320).toLowerCase();
+  if (!/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,63}$/iu.test(email)) return null;
+  const domain = email.split("@")[1];
+  const tld = domain.split(".").at(-1);
+  if (assetLikeEmailTlds.has(tld) || /@(2x|3x)\./iu.test(email)) return null;
+  return email;
+}
+
 function whatsappNumbers(html, nodes) {
   const candidates = [];
   for (const match of html.matchAll(/(?:wa\.me\/|api\.whatsapp\.com\/send\?[^"'\s>]*phone=|whatsapp:\/\/send\?[^"'\s>]*phone=)(\+?[\d(). -]{6,24})/giu)) {
@@ -214,6 +225,50 @@ function titleFromHtml(html) {
   return clean(decodeEntities(siteName || title), 300) || null;
 }
 
+const priorityPageRules = [
+  { pattern: /contact|contact-us|kontakt|contacto|contatti|联系我们|联系/iu, score: 100, reason: "联系方式" },
+  { pattern: /about|about-us|company|profile|who-we-are|unternehmen|ueber-uns|über-uns|acerca|qui-sommes|chi-siamo|关于|公司简介/iu, score: 90, reason: "企业介绍" },
+  { pattern: /factory|manufactur|production|facility|plant|capabilit|fabrica|fábrica|fabricacion|fabricación|工厂|生产|制造/iu, score: 85, reason: "工厂与能力" },
+  { pattern: /impressum|imprint|legal-notice|mentions-legales|company-details|工商|法律信息/iu, score: 80, reason: "企业法定信息" },
+  { pattern: /products?|solutions?|industries|applications?|catalog|catalogue|sortiment|produkte|产品|解决方案/iu, score: 65, reason: "产品与应用" }
+];
+
+const ignoredPagePattern = /login|log-in|sign-in|account|cart|checkout|privacy|cookie|terms|career|job|press|blog|news|download|support|faq|登录|隐私|条款|招聘/iu;
+const ignoredFilePattern = /\.(?:pdf|jpe?g|png|gif|webp|svg|zip|rar|docx?|xlsx?|pptx?|mp4|mp3)(?:$|[?#])/iu;
+
+function linkLabel(html) {
+  return clean(visibleText(html), 160);
+}
+
+export function extractPriorityPageLinks(html, pageUrl, options = {}) {
+  const base = normalizePublicWebsiteUrl(pageUrl);
+  const current = base.href;
+  const candidates = new Map();
+  for (const match of String(html || "").matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/giu)) {
+    const rawHref = decodeEntities(match[1]).trim();
+    if (!rawHref || rawHref.startsWith("#") || ignoredFilePattern.test(rawHref)) continue;
+    let url;
+    try {
+      url = normalizePublicWebsiteUrl(new URL(rawHref, base).href);
+    } catch {
+      continue;
+    }
+    if (siteKey(url.hostname) !== siteKey(base.hostname) || url.href === current) continue;
+    const label = linkLabel(match[2]);
+    const haystack = `${url.pathname} ${label}`;
+    if (ignoredPagePattern.test(haystack)) continue;
+    const rule = priorityPageRules.find((item) => item.pattern.test(haystack));
+    if (!rule) continue;
+    const previous = candidates.get(url.href);
+    const candidate = { url: url.href, label: label || rule.reason, reason: rule.reason, priority: rule.score };
+    if (!previous || candidate.priority > previous.priority) candidates.set(url.href, candidate);
+  }
+  const limit = Math.max(1, Math.min(20, Number(options.limit) || 12));
+  return [...candidates.values()]
+    .sort((left, right) => right.priority - left.priority || left.url.localeCompare(right.url))
+    .slice(0, limit);
+}
+
 export function extractPublicWebsiteEvidence(html, pageUrl, options = {}) {
   const observedAt = options.observedAt || new Date().toISOString();
   const sourceRef = String(pageUrl);
@@ -225,7 +280,7 @@ export function extractPublicWebsiteEvidence(html, pageUrl, options = {}) {
     ...hrefValues(html, "mailto").map((value) => value.split("?")[0]),
     ...nodes.map((node) => node.email),
     ...decodeEntities(html).matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}/giu)
-  ].map((value) => typeof value === "string" ? value : value?.[0]).filter(Boolean).map((value) => value.toLowerCase()));
+  ].map((value) => typeof value === "string" ? value : value?.[0]).map(normalizePublicEmail).filter(Boolean));
   const phones = unique([
     ...hrefValues(html, "tel"),
     ...nodes.map((node) => node.telephone)
@@ -261,6 +316,7 @@ export function extractPublicWebsiteEvidence(html, pageUrl, options = {}) {
     contacts: { emails, phones, whatsapp },
     addresses,
     factorySignals,
+    pageLinks: extractPriorityPageLinks(html, sourceRef),
     evidence,
     disclaimer: "官网内容属于企业自述，所有结果先作为候选证据；不得把公开联系方式等同于营销同意。"
   };
@@ -280,7 +336,7 @@ export async function fetchPublicWebsiteSnapshot(input, options = {}) {
       redirect: "manual",
       headers: {
         Accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
-        "User-Agent": "LydiaForeignTradeSystem/0.4 public-evidence-check"
+        "User-Agent": "LydiaForeignTradeSystem/0.7 public-evidence-check"
       },
       signal: options.signal || AbortSignal.timeout(12_000)
     });

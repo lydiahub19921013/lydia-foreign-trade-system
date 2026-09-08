@@ -590,6 +590,28 @@ function contactGroup(label, values) {
   return group;
 }
 
+function dossierPages(result) {
+  if (!Array.isArray(result.pages) || !result.pages.length) return null;
+  const details = document.createElement("details");
+  details.className = "dossier-pages";
+  const summary = document.createElement("summary");
+  summary.textContent = `查看已读取页面（${result.pages.length} 张）`;
+  const list = document.createElement("ul");
+  for (const page of result.pages) {
+    const item = document.createElement("li");
+    const source = document.createElement("a");
+    source.href = page.url;
+    source.target = "_blank";
+    source.rel = "noreferrer";
+    source.textContent = page.title || page.url;
+    const detail = document.createTextNode(` · ${page.discoveryReason || "公开页面"} · ${page.evidenceCount || 0} 条证据`);
+    item.append(source, detail);
+    list.append(item);
+  }
+  details.append(summary, list);
+  return details;
+}
+
 function websiteCard(result) {
   const card = document.createElement("article");
   card.className = "company-card";
@@ -613,6 +635,7 @@ function websiteCard(result) {
   const facts = document.createElement("dl");
   facts.className = "fact-grid";
   facts.append(
+    fact("读取范围", result.pageCount ? `${result.pageCount} 张同站公开页面` : "使用者指定的 1 张页面"),
     fact("公开地址", result.addresses?.join("；")),
     fact("生产/工厂自述", result.factorySignals?.join("；")),
     fact("观察时间", result.observedAt)
@@ -656,7 +679,10 @@ function websiteCard(result) {
     addToQueue.addEventListener("click", () => addProspectToDevelopmentQueue(result));
     actions.append(addToQueue);
   }
-  card.append(heading, contacts, facts, actions, evidenceList({ evidence: result.evidence }));
+  card.append(heading, contacts, facts);
+  const pages = dossierPages(result);
+  if (pages) card.append(pages);
+  card.append(actions, evidenceList({ evidence: result.evidence }));
   return card;
 }
 
@@ -669,16 +695,17 @@ async function searchWebsite(event) {
   event.preventDefault();
   const websiteUrl = $("#websiteUrl").value.trim();
   const confirmed = $("#websiteConfirmed").checked;
-  const button = $("#searchWebsite");
-  button.disabled = true;
-  updateStatus("#websiteStatus", "正在读取指定的公开官网页面……");
+  const mode = event.submitter?.dataset.mode === "dossier" ? "dossier" : "page";
+  const buttons = [$("#searchWebsite"), $("#buildWebsiteDossier")];
+  for (const button of buttons) button.disabled = true;
+  updateStatus("#websiteStatus", mode === "dossier" ? "正在整理最多 5 张同站公开页面……" : "正在读取指定的公开官网页面……");
   try {
     const parameters = new URLSearchParams({ url: websiteUrl, confirmed: String(confirmed) });
-    const response = await fetch(`/api/website/snapshot?${parameters}`);
+    const response = await fetch(`/api/website/${mode === "dossier" ? "dossier" : "snapshot"}?${parameters}`);
     const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || "官网读取失败");
+    if (!response.ok) throw new Error(payload.error || (mode === "dossier" ? "官网档案整理失败" : "官网读取失败"));
     currentWebsiteResearch = {
-      format: "lydia-public-website-evidence",
+      format: mode === "dossier" ? "lydia-public-website-dossier" : "lydia-public-website-evidence",
       schemaVersion: 1,
       product: "Lydia 外贸系统",
       ...payload
@@ -690,14 +717,16 @@ async function searchWebsite(event) {
       ...(payload.contacts?.phones || []),
       ...(payload.contacts?.whatsapp || [])
     ].length;
-    updateStatus("#websiteStatus", `已读取 1 张页面，形成 ${payload.evidence.length} 条候选证据，其中 ${contacts} 条公开联系线索。请逐项人工核查。`, "success");
+    const pages = payload.pageCount || 1;
+    const failureText = payload.failures?.length ? `，另有 ${payload.failures.length} 张候选页面未能读取` : "";
+    updateStatus("#websiteStatus", `已读取 ${pages} 张页面，形成 ${payload.evidence.length} 条候选证据，其中 ${contacts} 条公开联系线索${failureText}。请逐项人工核查。`, "success");
   } catch (error) {
     currentWebsiteResearch = null;
     $("#websiteResults").replaceChildren();
     $("#exportWebsiteEvidence").disabled = true;
     updateStatus("#websiteStatus", error.message || "官网读取失败，请检查网址或稍后重试。", "error");
   } finally {
-    button.disabled = false;
+    for (const button of buttons) button.disabled = false;
   }
 }
 

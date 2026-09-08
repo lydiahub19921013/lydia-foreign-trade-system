@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  extractPriorityPageLinks,
   extractPublicWebsiteEvidence,
   fetchPublicWebsiteSnapshot,
   isPublicIp,
@@ -41,15 +42,30 @@ test("IP classifier rejects private ranges", () => {
 test("website HTML becomes candidate evidence with public contact sources", () => {
   const html = `<!doctype html><html><head><title>Northstar Demo</title>
     <script type="application/ld+json">{"@type":"Organization","name":"Northstar Demo Imports","email":"sales@northstar.example.com","telephone":"+1 555 0100","address":{"streetAddress":"88 Sample Road","addressLocality":"Demo City","addressCountry":"US"}}</script>
-    </head><body><a href="mailto:export@northstar.example.com">Email</a><a href="https://wa.me/15550101">WhatsApp</a><p>Our factory operates two production lines.</p></body></html>`;
+    </head><body><a href="mailto:export@northstar.example.com">Email</a><img src="/ajax-loader@2x.gif"><a href="https://wa.me/15550101">WhatsApp</a><p>Our factory operates two production lines.</p></body></html>`;
   const result = extractPublicWebsiteEvidence(html, "https://northstar.example.com/contact", { observedAt: "2026-09-08T00:00:00Z" });
   assert.equal(result.title, "Northstar Demo Imports");
   assert.deepEqual(result.contacts.emails, ["export@northstar.example.com", "sales@northstar.example.com"]);
+  assert.ok(!result.contacts.emails.includes("ajax-loader@2x.gif"));
   assert.deepEqual(result.contacts.whatsapp, ["15550101"]);
   assert.equal(result.addresses[0], "88 Sample Road, Demo City, US");
   assert.ok(result.factorySignals[0].includes("factory"));
   assert.ok(result.evidence.every((item) => item.status === "candidate"));
   assert.ok(result.evidence.every((item) => item.sourceRef === "https://northstar.example.com/contact"));
+});
+
+test("priority page discovery keeps only bounded same-site business pages", () => {
+  const html = `<nav>
+    <a href="/contact">Contact us</a>
+    <a href="https://www.example.com/about">About company</a>
+    <a href="/factory">Production facility</a>
+    <a href="/privacy">Privacy</a>
+    <a href="/catalog.pdf">Catalog</a>
+    <a href="https://social.example.net/company">Social</a>
+  </nav>`;
+  const links = extractPriorityPageLinks(html, "https://example.com/");
+  assert.deepEqual(links.map((item) => item.reason), ["联系方式", "企业介绍", "工厂与能力"]);
+  assert.ok(links.every((item) => new URL(item.url).hostname.endsWith("example.com")));
 });
 
 test("website fetch allows same-site redirects and retains the final source", async () => {

@@ -168,7 +168,7 @@
         <div class="panel-heading">
           <div>
             <p class="section-label">STEP 05 · 官网证据</p>
-            <h2 id="website-title">从一张公开官网页面补证</h2>
+            <h2 id="website-title">从官网公开页面补证</h2>
           </div>
           <button id="exportWebsiteEvidence" class="button ghost" type="button" disabled>导出官网证据</button>
         </div>
@@ -182,9 +182,12 @@
             <input id="websiteConfirmed" type="checkbox" required />
             <span>我确认该页面公开可访问或已获授权</span>
           </label>
-          <button id="searchWebsite" class="button primary" type="submit">读取这一页</button>
+          <div class="website-action-buttons">
+            <button id="searchWebsite" class="button ghost" type="submit" data-mode="page">只读取这一页</button>
+            <button id="buildWebsiteDossier" class="button primary" type="submit" data-mode="dossier">整理官网档案（最多5页）</button>
+          </div>
         </form>
-        <p class="privacy-note">系统只读取你指定的一页，不登录、不遍历整站；拦截本机/内网地址、跨站跳转和超大页面。官网邮箱、电话、WhatsApp、地址及工厂描述全部先标为候选，公开不等于同意接收营销。</p>
+        <p class="privacy-note">单页模式只读取你指定的一页；官网档案模式从该页发现并最多读取 4 张同站的联系、公司、工厂或产品页。不登录、不扫描整站，并拦截本机/内网地址、跨站跳转和超大页面。所有结果先标为候选，公开不等于同意接收营销。</p>
         <label class="target-picker">
           <span>人工确认后保存到</span>
           <select id="websiteTargetLead" disabled><option value="">请先导入询盘</option></select>

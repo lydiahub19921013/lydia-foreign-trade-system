@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { searchGleifEntities } from "../integrations/gleif/client.mjs";
 import { searchWithExaAgentReach } from "../integrations/exa-agent-reach/client.mjs";
 import { checkMailDomain } from "../integrations/mail-domain/check.mjs";
+import { fetchPublicWebsiteDossier } from "../integrations/public-website/dossier.mjs";
 import { fetchPublicWebsiteSnapshot } from "../integrations/public-website/snapshot.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -48,6 +49,7 @@ export function createWorkbenchServer(options = {}) {
   const prospectSearch = options.prospectSearch || searchWithExaAgentReach;
   const mailDomainCheck = options.mailDomainCheck || checkMailDomain;
   const websiteSnapshot = options.websiteSnapshot || fetchPublicWebsiteSnapshot;
+  const websiteDossier = options.websiteDossier || fetchPublicWebsiteDossier;
 
   return createServer(async (request, response) => {
     if (!["GET", "HEAD"].includes(request.method)) {
@@ -106,6 +108,23 @@ export function createWorkbenchServer(options = {}) {
         const inputError = /请输入|只支持|不能|公网地址|其他域名|超过 1 MB|网页文本|跳转次数/iu.test(message);
         writeJson(response, inputError ? 400 : 502, {
           error: inputError ? message : "官网暂时无法读取，请检查网址或稍后重试。"
+        }, request.method);
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/website/dossier") {
+      if (url.searchParams.get("confirmed") !== "true") {
+        writeJson(response, 400, { error: "请先确认该网站公开可访问或已获授权。" }, request.method);
+        return;
+      }
+      try {
+        writeJson(response, 200, await websiteDossier(url.searchParams.get("url") || "", { maxPages: 5 }), request.method);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "官网档案整理失败";
+        const inputError = /请输入|只支持|不能|公网地址|其他域名|超过 1 MB|网页文本|跳转次数/iu.test(message);
+        writeJson(response, inputError ? 400 : 502, {
+          error: inputError ? message : "官网档案暂时无法整理，请检查网址或改用单页补证。"
         }, request.method);
       }
       return;

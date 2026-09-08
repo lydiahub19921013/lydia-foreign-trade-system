@@ -7,7 +7,13 @@ import {
   leadsFromCsv,
   mergeEvidenceIntoLead,
   normalizeLead,
+  createProspectSearchPlan,
+  prospectToLead,
+  prospectsFromCsv,
+  prospectsFromJson,
+  prospectsFromSearchResults,
   qualifyLead,
+  rankPublicProspects,
   rankIntroductionPaths,
   relationshipsFromCsv,
   relationshipsFromJson
@@ -15,6 +21,9 @@ import {
 
 const $ = (selector) => document.querySelector(selector);
 let currentResult = null;
+let currentProspectPlan = null;
+let currentProspectResult = null;
+let currentProspectForWebsite = null;
 let currentCompanyResearch = null;
 let currentWebsiteResearch = null;
 let currentEmailResearch = null;
@@ -279,6 +288,195 @@ function fact(label, value) {
   return row;
 }
 
+function prospectStageLabel(prospect) {
+  if (prospect.qualification.stage === "primary") return "优先候选";
+  if (prospect.qualification.stage === "shortlist") return "已核查候选";
+  if (prospect.qualification.stage === "reviewed") return "已看原页，仍需补证";
+  return "搜索候选，未核查原页";
+}
+
+function prospectCard(prospect) {
+  const card = document.createElement("article");
+  card.className = "prospect-card";
+  const heading = document.createElement("div");
+  heading.className = "company-heading";
+  const title = document.createElement("h3");
+  title.textContent = prospect.companyName || prospect.title || "未命名公开候选";
+  const badge = document.createElement("span");
+  badge.className = prospect.qualification.stage === "primary" ? "evidence-badge verified" : "evidence-badge";
+  badge.textContent = prospectStageLabel(prospect);
+  heading.append(title, badge);
+
+  const meta = document.createElement("p");
+  meta.className = "prospect-meta";
+  meta.textContent = [prospect.product, prospect.market, prospect.buyerType, prospect.publishedAt?.slice(0, 10)].filter(Boolean).join(" · ") || "缺少产品或市场背景";
+  const excerpt = document.createElement("p");
+  excerpt.className = "prospect-excerpt";
+  const fullExcerpt = prospect.signalExcerpt || "没有可引用的公开信号，不能进入优先名单。";
+  excerpt.textContent = fullExcerpt.length > 700 ? `${fullExcerpt.slice(0, 699)}…` : fullExcerpt;
+
+  const score = document.createElement("div");
+  score.className = "prospect-score";
+  const scoreNumber = document.createElement("strong");
+  scoreNumber.textContent = prospect.qualification.score;
+  const scoreCaption = document.createElement("span");
+  scoreCaption.textContent = prospect.qualification.cap === 49 ? "候选分 · 上限 49" : "公开信号分 / 100";
+  score.append(scoreNumber, scoreCaption);
+
+  const source = document.createElement("a");
+  source.className = "source-link";
+  source.href = prospect.sourceUrl;
+  source.target = "_blank";
+  source.rel = "noreferrer";
+  source.textContent = "打开搜索来源 ↗";
+
+  const review = document.createElement("button");
+  review.className = "button primary compact";
+  review.type = "button";
+  review.textContent = "送去官网补证";
+  review.disabled = !prospect.sourceUrl;
+  review.addEventListener("click", () => {
+    currentProspectForWebsite = prospect;
+    $("#websiteUrl").value = prospect.sourceUrl || "";
+    $("#websiteConfirmed").checked = false;
+    updateStatus("#websiteStatus", "已带入候选来源。请确认它是否为企业原始公开页面；若是目录或社媒页，请改填该企业官网。", "neutral");
+    $("#website-title").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  actions.append(source, review);
+  const body = document.createElement("div");
+  body.append(heading, meta, excerpt, actions);
+  card.append(body, score);
+  return card;
+}
+
+function showProspectResults(prospects, source, provider = "local-import") {
+  const ranked = rankPublicProspects(prospects);
+  currentProspectResult = {
+    format: "lydia-public-prospects",
+    schemaVersion: 1,
+    product: "Lydia 外贸系统",
+    generatedAt: new Date().toISOString(),
+    source,
+    provider,
+    count: ranked.length,
+    prospects: ranked,
+    disclaimer: "搜索摘要和导入候选都不是已核实事实；必须回到原始公开页面核查。"
+  };
+  const container = $("#prospectResults");
+  container.replaceChildren();
+  if (ranked.length) container.append(...ranked.map(prospectCard));
+  else {
+    const empty = document.createElement("p");
+    empty.className = "empty bordered-empty";
+    empty.textContent = "没有返回可识别的公开候选。可以换一个搜索方向或导入 Lydia 候选文件。";
+    container.append(empty);
+  }
+  $("#exportProspects").disabled = false;
+  updateStatus("#prospectStatus", `得到 ${ranked.length} 个公开候选；它们都还不能当作已确认客户，请先补看原始页面。`, ranked.length ? "success" : "neutral");
+}
+
+function renderProspectPlan(plan) {
+  const container = $("#prospectQueries");
+  container.replaceChildren();
+  for (const item of plan.queries) {
+    const card = document.createElement("article");
+    card.className = "query-card";
+    const label = document.createElement("strong");
+    label.textContent = item.label;
+    const queryText = document.createElement("p");
+    queryText.textContent = item.query;
+    const purpose = document.createElement("small");
+    purpose.textContent = item.purpose;
+    const search = document.createElement("button");
+    search.className = "button ghost compact";
+    search.type = "button";
+    search.textContent = "搜索这个方向";
+    search.addEventListener("click", () => searchPublicProspects(item, search));
+    card.append(label, queryText, purpose, search);
+    container.append(card);
+  }
+}
+
+function buildProspectPlan(event) {
+  event.preventDefault();
+  try {
+    currentProspectPlan = createProspectSearchPlan({
+      product: $("#prospectProduct").value,
+      market: $("#prospectMarket").value,
+      buyerType: $("#prospectBuyerType").value,
+      application: $("#prospectApplication").value
+    });
+    renderProspectPlan(currentProspectPlan);
+    updateStatus("#prospectStatus", "已生成 5 个搜索方向。勾选公开信息确认后，选择一个方向搜索。", "success");
+  } catch (error) {
+    updateStatus("#prospectStatus", error.message || "无法生成搜索计划。", "error");
+  }
+}
+
+async function searchPublicProspects(item, button) {
+  if (!$("#prospectSearchConfirmed").checked) {
+    updateStatus("#prospectStatus", "请先勾选公开商业信息与 Exa 数据去向确认。", "error");
+    return;
+  }
+  button.disabled = true;
+  updateStatus("#prospectStatus", `正在搜索「${item.label}」方向……`);
+  try {
+    const parameters = new URLSearchParams({ q: item.query, limit: "5", confirmed: "true" });
+    const response = await fetch(`/api/prospects/search?${parameters}`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "公开候选搜索失败");
+    const prospects = prospectsFromSearchResults(payload.results, currentProspectPlan.context, payload.observedAt);
+    showProspectResults(prospects, item.query, payload.provider);
+  } catch (error) {
+    updateStatus("#prospectStatus", error.message || "公开候选搜索失败。", "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadProspectFile(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const defaults = currentProspectPlan?.context || {};
+    const prospects = file.name.toLowerCase().endsWith(".csv")
+      ? prospectsFromCsv(text, defaults)
+      : prospectsFromJson(JSON.parse(text), defaults);
+    showProspectResults(prospects, file.name);
+  } catch (error) {
+    updateStatus("#prospectStatus", error.message || "候选文件导入失败。", "error");
+  }
+}
+
+function addProspectToDevelopmentQueue(websiteResearch) {
+  if (!currentProspectForWebsite) {
+    updateStatus("#websiteStatus", "请先从主动找客户区域选择一个候选。", "error");
+    return;
+  }
+  try {
+    const lead = prospectToLead(currentProspectForWebsite, {
+      ...websiteResearch,
+      originalPageReviewed: true
+    });
+    if (currentResult?.results.some((item) => item.lead.id === lead.id)) {
+      updateStatus("#websiteStatus", "这个公开候选已经在当前开发队列中。", "error");
+      return;
+    }
+    const leads = currentResult ? [...currentResult.results.map((item) => item.lead), lead] : [lead];
+    currentResult = buildResult(leads, currentResult?.sourceFile || "主动开发队列");
+    populateResearchLeadTargets();
+    renderSummary();
+    renderLeads();
+    $("#dashboard").classList.remove("hidden");
+    updateStatus("#websiteStatus", `已把「${lead.organization.name || "公开候选"}」加入开发队列；它不是主动询盘，仍需补需求和联系人证据。`, "success");
+  } catch (error) {
+    updateStatus("#websiteStatus", error.message || "无法加入开发队列。", "error");
+  }
+}
+
 function companyCard(company) {
   const card = document.createElement("article");
   card.className = "company-card";
@@ -431,6 +629,7 @@ function websiteCard(result) {
   save.className = "button ghost compact";
   save.type = "button";
   save.textContent = "人工确认并加入询盘";
+  save.disabled = !currentResult?.results.length;
   save.addEventListener("click", () => attachResearchEvidence("#websiteTargetLead", {
     organization: {
       name: result.title,
@@ -449,6 +648,14 @@ function websiteCard(result) {
   const actions = document.createElement("div");
   actions.className = "card-actions";
   actions.append(source, save);
+  if (currentProspectForWebsite) {
+    const addToQueue = document.createElement("button");
+    addToQueue.className = "button primary compact";
+    addToQueue.type = "button";
+    addToQueue.textContent = "确认原页并加入开发队列";
+    addToQueue.addEventListener("click", () => addProspectToDevelopmentQueue(result));
+    actions.append(addToQueue);
+  }
   card.append(heading, contacts, facts, actions, evidenceList({ evidence: result.evidence }));
   return card;
 }
@@ -683,6 +890,23 @@ async function loadRelationshipFile(file) {
     updateStatus("#relationshipStatus", error.message || "关系文件导入失败。", "error");
   }
 }
+
+$("#prospectPlanForm").addEventListener("submit", buildProspectPlan);
+$("#prospectFile").addEventListener("change", (event) => loadProspectFile(event.target.files[0]));
+$("#loadProspectSample").addEventListener("click", async () => {
+  try {
+    const response = await fetch("/examples/prospects.sample.json");
+    if (!response.ok) throw new Error("无法读取虚构候选样例");
+    showProspectResults(prospectsFromJson(await response.json()), "prospects.sample.json");
+  } catch (error) {
+    updateStatus("#prospectStatus", error.message || "无法读取虚构候选样例。", "error");
+  }
+});
+$("#exportProspects").addEventListener("click", () => {
+  if (!currentProspectResult) return;
+  downloadJson(currentProspectResult, `Lydia-公开候选-${new Date().toISOString().slice(0, 10)}.json`);
+  updateStatus("#prospectStatus", "公开候选已导出；搜索摘要仍需回到原始页面核查。", "success");
+});
 
 $("#leadFile").addEventListener("change", (event) => loadSelectedFile(event.target.files[0]));
 $("#gradeFilter").addEventListener("change", renderLeads);

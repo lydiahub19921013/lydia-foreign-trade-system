@@ -10,3 +10,13 @@ export {
 export { findDuplicateCandidates } from "./deduplication.mjs";
 export { mergeEvidenceIntoLead } from "./enrichment.mjs";
 export { assessEmailCandidates, checkEmailCandidateLeadMatch, generateEmailCandidates, normalizeCompanyDomain } from "./email-candidates.mjs";
+export {
+  createProspectSearchPlan,
+  normalizePublicProspect,
+  prospectToLead,
+  prospectsFromCsv,
+  prospectsFromJson,
+  prospectsFromSearchResults,
+  rankPublicProspects,
+  scorePublicProspect
+} from "./prospects.mjs";

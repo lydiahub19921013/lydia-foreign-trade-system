@@ -4,11 +4,17 @@ import { createServer } from "node:http";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { searchGleifEntities } from "../integrations/gleif/client.mjs";
+import { searchWithExaAgentReach } from "../integrations/exa-agent-reach/client.mjs";
 import { checkMailDomain } from "../integrations/mail-domain/check.mjs";
 import { fetchPublicWebsiteSnapshot } from "../integrations/public-website/snapshot.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entryPage = resolve(repositoryRoot, "apps/lead-workbench/index.html");
+const publicRoots = [
+  resolve(repositoryRoot, "apps/lead-workbench"),
+  resolve(repositoryRoot, "packages/lead-core/src"),
+  resolve(repositoryRoot, "examples")
+];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
@@ -23,8 +29,8 @@ function requestedFile(requestUrl) {
   const pathname = decodeURIComponent(new URL(requestUrl, "http://localhost").pathname);
   if (pathname === "/") return entryPage;
   const path = resolve(repositoryRoot, pathname.replace(/^\/+/, ""));
-  if (path !== repositoryRoot && !path.startsWith(`${repositoryRoot}${sep}`)) return null;
-  return path;
+  if (path === repositoryRoot || !path.startsWith(`${repositoryRoot}${sep}`)) return null;
+  return publicRoots.some((root) => path === root || path.startsWith(`${root}${sep}`)) ? path : null;
 }
 
 function writeJson(response, status, payload, method = "GET") {
@@ -39,6 +45,7 @@ function writeJson(response, status, payload, method = "GET") {
 
 export function createWorkbenchServer(options = {}) {
   const gleifSearch = options.gleifSearch || searchGleifEntities;
+  const prospectSearch = options.prospectSearch || searchWithExaAgentReach;
   const mailDomainCheck = options.mailDomainCheck || checkMailDomain;
   const websiteSnapshot = options.websiteSnapshot || fetchPublicWebsiteSnapshot;
 
@@ -50,6 +57,26 @@ export function createWorkbenchServer(options = {}) {
     }
 
     const url = new URL(request.url, "http://localhost");
+    if (url.pathname === "/api/prospects/search") {
+      if (url.searchParams.get("confirmed") !== "true") {
+        writeJson(response, 400, { error: "请先确认只搜索公开商业信息，并理解搜索词会发送给 Exa。" }, request.method);
+        return;
+      }
+      try {
+        const result = await prospectSearch(url.searchParams.get("q") || "", {
+          numResults: Number(url.searchParams.get("limit") || 5)
+        });
+        writeJson(response, 200, result, request.method);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "公开搜索失败";
+        const inputError = /至少需要|不能超过/iu.test(message);
+        writeJson(response, inputError ? 400 : 502, {
+          error: inputError ? message : "公开候选搜索暂时不可用；可改用 Lydia JSON/CSV 导入。"
+        }, request.method);
+      }
+      return;
+    }
+
     if (url.pathname === "/api/gleif/search") {
       try {
         const result = await gleifSearch(url.searchParams.get("q") || "", {

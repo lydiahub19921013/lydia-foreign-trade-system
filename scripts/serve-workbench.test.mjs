@@ -52,6 +52,47 @@ test("workbench server proxies only structured GLEIF searches", async () => {
   });
 });
 
+test("workbench server requires disclosure confirmation before public prospect search", async () => {
+  const calls = [];
+  await withServer(async (origin) => {
+    const missingConfirmation = await fetch(`${origin}/api/prospects/search?q=reusable%20bottle`);
+    assert.equal(missingConfirmation.status, 400);
+    assert.match((await missingConfirmation.json()).error, /Exa/);
+
+    const response = await fetch(`${origin}/api/prospects/search?confirmed=true&q=reusable%20bottle&limit=3`);
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).provider, "exa-agent-reach");
+    assert.deepEqual(calls, [{ query: "reusable bottle", options: { numResults: 3 } }]);
+  }, {
+    prospectSearch: async (query, options) => {
+      calls.push({ query, options });
+      return { provider: "exa-agent-reach", query, results: [] };
+    }
+  });
+});
+
+test("workbench server separates public search input errors from provider failures", async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/prospects/search?confirmed=true&q=x`);
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /至少需要/);
+  }, {
+    prospectSearch: async () => {
+      throw new Error("公开搜索词至少需要 3 个字符");
+    }
+  });
+
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/prospects/search?confirmed=true&q=valid%20query`);
+    assert.equal(response.status, 502);
+    assert.deepEqual(await response.json(), { error: "公开候选搜索暂时不可用；可改用 Lydia JSON/CSV 导入。" });
+  }, {
+    prospectSearch: async () => {
+      throw new Error("private provider detail");
+    }
+  });
+});
+
 test("workbench server separates input errors from provider failures", async () => {
   await withServer(async (origin) => {
     const shortQuery = await fetch(`${origin}/api/gleif/search?q=a`);
@@ -147,5 +188,7 @@ test("workbench server rejects writes and path traversal", async () => {
     assert.equal((await fetch(origin, { method: "POST" })).status, 405);
     const traversal = await fetch(`${origin}/%2e%2e/%2e%2e/etc/passwd`);
     assert.ok([403, 404].includes(traversal.status));
+    assert.equal((await fetch(`${origin}/.git/config`)).status, 403);
+    assert.equal((await fetch(`${origin}/README.md`)).status, 403);
   });
 });

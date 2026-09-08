@@ -1,5 +1,5 @@
 import { readFile, readdir } from "node:fs/promises";
-import { extname, join, relative, resolve } from "node:path";
+import { extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -44,10 +44,22 @@ if (brand.productName !== "Lydia 外贸系统" || brand.owner !== "Lydia") {
   violations.push("品牌配置不是 Lydia 独立信息");
 }
 
-const sample = await readFile(join(root, "examples/inquiries.sample.csv"), "utf8");
-const sampleEmails = [...sample.matchAll(/[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})/giu)];
-if (sampleEmails.some((match) => match[1] !== "example.com" && !match[1].endsWith(".example"))) {
-  violations.push("示例文件含有非保留示例域名邮箱");
+for (const path of files.filter((path) => relative(root, path).startsWith(`examples${sep}`))) {
+  const sample = await readFile(path, "utf8");
+  const sampleEmails = [...sample.matchAll(/[A-Z0-9._%+-]+@([A-Z0-9.-]+\.[A-Z]{2,})/giu)];
+  if (sampleEmails.some((match) => match[1] !== "example.com" && !match[1].endsWith(".example"))) {
+    violations.push(`${relative(root, path)} 含有非保留示例域名邮箱`);
+  }
+  for (const match of sample.matchAll(/https?:\/\/[^\s"',]+/giu)) {
+    try {
+      const hostname = new URL(match[0]).hostname.toLowerCase();
+      if (hostname !== "example.com" && !hostname.endsWith(".example")) {
+        violations.push(`${relative(root, path)} 含有非保留示例网址`);
+      }
+    } catch {
+      violations.push(`${relative(root, path)} 含有格式不正确的示例网址`);
+    }
+  }
 }
 
 if (violations.length) {

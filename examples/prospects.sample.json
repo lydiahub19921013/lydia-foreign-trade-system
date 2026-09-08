@@ -1,0 +1,47 @@
+{
+  "format": "lydia-public-prospects",
+  "schemaVersion": 1,
+  "product": "Lydia 外贸系统",
+  "notice": "全部为虚构公司、保留示例域名和虚构业务信号。",
+  "prospects": [
+    {
+      "companyName": "Northstar Demo Distribution",
+      "title": "Northstar Demo announces a new reusable drinkware range",
+      "sourceUrl": "https://northstar.example/news/new-range",
+      "publishedAt": "2026-09-01T00:00:00Z",
+      "observedAt": "2026-09-08T00:00:00Z",
+      "signalExcerpt": "The fictional company publicly announced a new reusable drinkware range and invited supplier introductions.",
+      "signalType": "new-product-range",
+      "product": "Reusable stainless steel bottle",
+      "market": "Exampleland",
+      "buyerType": "Distributor",
+      "originalPageReviewed": false,
+      "scoreInput": {
+        "needSignal": 3,
+        "productFit": 4,
+        "timing": 4,
+        "publicReachability": 3,
+        "evidenceQuality": 1
+      }
+    },
+    {
+      "companyName": "Harbor Demo Imports",
+      "title": "Harbor Demo public company profile",
+      "sourceUrl": "https://harbor.example/about",
+      "observedAt": "2026-09-08T00:00:00Z",
+      "signalExcerpt": "The fictional profile describes a consumer-goods importing business but contains no current purchasing signal.",
+      "signalType": "company-profile",
+      "product": "Reusable stainless steel bottle",
+      "market": "Exampleland",
+      "buyerType": "Importer",
+      "originalPageReviewed": false,
+      "scoreInput": {
+        "needSignal": 1,
+        "productFit": 2,
+        "timing": 0,
+        "publicReachability": 3,
+        "evidenceQuality": 1
+      }
+    }
+  ]
+}

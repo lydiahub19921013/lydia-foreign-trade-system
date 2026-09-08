@@ -88,10 +88,57 @@
         <div id="leadList" class="lead-list"></div>
       </section>
 
+      <section class="prospect-panel" aria-labelledby="prospect-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 03 · 主动找客户</p>
+            <h2 id="prospect-title">先找公开信号，再找公司</h2>
+          </div>
+          <div class="toolbar">
+            <button id="loadProspectSample" class="button ghost" type="button">使用虚构样例</button>
+            <button id="exportProspects" class="button primary" type="button" disabled>导出候选</button>
+          </div>
+        </div>
+
+        <form id="prospectPlanForm" class="prospect-form">
+          <label>
+            <span>你提供的产品</span>
+            <input id="prospectProduct" maxlength="160" required placeholder="例如：reusable stainless steel bottle" />
+          </label>
+          <label>
+            <span>目标市场</span>
+            <input id="prospectMarket" maxlength="100" required placeholder="例如：Germany" />
+          </label>
+          <label>
+            <span>买家类型</span>
+            <input id="prospectBuyerType" maxlength="120" placeholder="例如：distributor / importer" />
+          </label>
+          <label>
+            <span>应用场景（可选）</span>
+            <input id="prospectApplication" maxlength="160" placeholder="例如：corporate gifts" />
+          </label>
+          <button id="createProspectPlan" class="button primary" type="submit">生成搜索计划</button>
+        </form>
+
+        <div id="prospectQueries" class="query-grid"></div>
+        <label class="consent-check prospect-consent">
+          <input id="prospectSearchConfirmed" type="checkbox" />
+          <span>我确认只搜索公开商业信息，并理解选中的搜索词会发送给 Exa；不会放入询盘正文、私人通讯录或联系人资料。</span>
+        </label>
+        <label class="compact-drop-zone prospect-import" for="prospectFile">
+          <input id="prospectFile" type="file" accept=".csv,.json,text/csv,application/json" />
+          <strong>也可以导入 Lydia 候选 CSV / JSON</strong>
+          <small>文件只在当前浏览器处理。没有原始来源链接或未核查原页的候选，最高只能得到 49 分。</small>
+        </label>
+        <p class="privacy-note">搜索标题和摘要只能帮你发现候选，不能证明对方有采购需求。点击“送去官网补证”后，仍要核查原始公司页面；系统不会自动保存搜索结果、抓私人资料或发送消息。</p>
+        <p id="prospectStatus" class="status" role="status" aria-live="polite">先填写产品和市场，生成 5 个有目的的搜索方向。</p>
+        <div id="prospectResults" class="prospect-results"></div>
+      </section>
+
       <section class="research-panel" aria-labelledby="company-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 03 · 企业核验</p>
+            <p class="section-label">STEP 04 · 企业核验</p>
             <h2 id="company-title">查清这家公司是谁</h2>
           </div>
           <button id="exportCompanyEvidence" class="button ghost" type="button" disabled>导出核验证据</button>
@@ -120,7 +167,7 @@
       <section class="website-panel" aria-labelledby="website-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 04 · 官网证据</p>
+            <p class="section-label">STEP 05 · 官网证据</p>
             <h2 id="website-title">从一张公开官网页面补证</h2>
           </div>
           <button id="exportWebsiteEvidence" class="button ghost" type="button" disabled>导出官网证据</button>
@@ -149,7 +196,7 @@
       <section class="email-panel" aria-labelledby="email-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 05 · 候选邮箱</p>
+            <p class="section-label">STEP 06 · 候选邮箱</p>
             <h2 id="email-title">生成候选，不冒充验证</h2>
           </div>
           <button id="exportEmailCandidates" class="button ghost" type="button" disabled>导出候选邮箱</button>
@@ -178,7 +225,7 @@
       <section class="relationship-panel" aria-labelledby="relationship-title">
         <div class="panel-heading">
           <div>
-            <p class="section-label">STEP 06 · 信任路径</p>
+            <p class="section-label">STEP 07 · 信任路径</p>
             <h2 id="relationship-title">谁适合帮你建立信任</h2>
           </div>
           <div class="toolbar">

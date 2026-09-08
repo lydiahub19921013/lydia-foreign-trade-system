@@ -1,0 +1,4 @@
+interface:
+  display_name: "外贸工具复用开发"
+  short_description: "复用个人外贸母版，为客户创建、定制并验收可交付的轻量软件"
+  default_prompt: "使用 $foreign-trade-tool-builder 基于我的外贸工具母版，为这个客户设计并交付一个独立软件。"

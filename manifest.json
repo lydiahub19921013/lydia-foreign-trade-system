@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "外贸开发插件",
+  "version": "0.1.0",
+  "description": "识别外贸沟通场景，生成英文回复，并在本机保存客户资料与历史记录。",
+  "permissions": [
+    "storage",
+    "sidePanel",
+    "contextMenus"
+  ],
+  "optional_host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "src/sidepanel.html"
+  },
+  "action": {
+    "default_title": "打开外贸开发插件"
+  }
+}

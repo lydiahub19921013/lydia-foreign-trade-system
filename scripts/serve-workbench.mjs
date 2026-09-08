@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { dirname, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { searchGleifEntities } from "../integrations/gleif/client.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entryPage = resolve(repositoryRoot, "apps/lead-workbench/index.html");
@@ -24,11 +25,41 @@ function requestedFile(requestUrl) {
   return path;
 }
 
-export function createWorkbenchServer() {
+function writeJson(response, status, payload, method = "GET") {
+  response.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'"
+  });
+  response.end(method === "HEAD" ? undefined : `${JSON.stringify(payload)}\n`);
+}
+
+export function createWorkbenchServer(options = {}) {
+  const gleifSearch = options.gleifSearch || searchGleifEntities;
+
   return createServer(async (request, response) => {
     if (!["GET", "HEAD"].includes(request.method)) {
       response.writeHead(405, { "Content-Type": "text/plain; charset=utf-8", Allow: "GET, HEAD" });
       response.end("Method not allowed");
+      return;
+    }
+
+    const url = new URL(request.url, "http://localhost");
+    if (url.pathname === "/api/gleif/search") {
+      try {
+        const result = await gleifSearch(url.searchParams.get("q") || "", {
+          jurisdiction: url.searchParams.get("jurisdiction") || "",
+          pageSize: 5
+        });
+        writeJson(response, 200, result, request.method);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "企业核验服务暂时不可用";
+        const inputError = /至少需要/.test(message);
+        writeJson(response, inputError ? 400 : 502, {
+          error: inputError ? message : "GLEIF 企业核验暂时失败，请稍后重试。"
+        }, request.method);
+      }
       return;
     }
 

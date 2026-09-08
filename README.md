@@ -2,12 +2,17 @@
 
 Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信息、联系人证据和熟人关系线索整理为可核查的客户档案，并给出分级与下一步建议。
 
-当前可用的第一条完整链路：
+当前可用的三条链路：
 
 1. 批量导入阿里巴巴、中国制造网或人工整理的询盘 CSV/JSON；
 2. 按证据质量、需求清晰度、购买准备度、可联系性与信任基础评分；
 3. 输出 A/B/C/D/HOLD 分级、缺失证据和下一步动作；
 4. 在 `apps/communication-extension` 中继续完成邮件、WhatsApp 等场景的人工沟通。
+
+工作台还可以：
+
+- 主动查询 GLEIF 官方 LEI 数据，核对海外企业的法定名称、登记编号、地址与状态；
+- 导入客户自己拥有或授权的通讯录/CRM 关系记录，排除拒绝路径并给出熟人引荐顺序。
 
 ## 立即使用
 
@@ -17,7 +22,7 @@ Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信�
 npm run workbench
 ```
 
-然后打开终端显示的本机地址，在网页里导入询盘、查看分级并导出 Lydia 分级结果。也可以继续使用命令行：
+然后打开终端显示的本机地址，在网页里导入询盘、查看分级、查询企业、评估信任路径并导出结果。也可以继续使用命令行：
 
 ```bash
 npm run qualify -- examples/inquiries.sample.csv
@@ -25,7 +30,7 @@ npm run qualify -- examples/inquiries.sample.csv --output ./qualification-result
 npm run check
 ```
 
-所有示例均为虚构数据。默认不联网、不抓取社媒、不发送消息，也不会把客户数据交给第三方服务。
+所有示例均为虚构数据。询盘和关系文件只在浏览器页面处理，不抓取社媒、不发送消息。只有使用者主动点击“查询 GLEIF”时，企业名称和可选司法辖区才会发给 GLEIF 官方接口；询盘正文和联系人信息不会发送。
 
 ## 系统边界
 
@@ -33,7 +38,7 @@ npm run check
 - `apps/lead-workbench`：只在本机运行的可视化询盘工作台。
 - `apps/inquiry-qualifier`：可运行的批量询盘分级工具。
 - `apps/communication-extension`：Lydia 的外贸沟通浏览器插件。
-- `integrations`：可选研究/验证适配器；只有明确配置后才启用。
+- `integrations`：可选研究/验证适配器；GLEIF 只通过固定官方接口主动查询，其他提供方只有明确配置后才启用。
 - `skills/lydia-foreign-trade-system`：供 Codex 复用的 Lydia 工作流 Skill。
 
 沟通插件仍保留自己的独立私有仓库，并以 Git subtree 纳入本系统。需要同步其新版本时，在系统仓库执行：
@@ -51,4 +56,4 @@ git subtree pull --prefix apps/communication-extension \
 
 ## 规划
 
-详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md) 和 [路线图](./docs/ROADMAP.md)。
+详见 [系统架构](./docs/ARCHITECTURE.md)、[客户调研](./docs/CUSTOMER_RESEARCH.md)、[关系数据导入](./docs/RELATIONSHIP_IMPORTS.md) 和 [路线图](./docs/ROADMAP.md)。

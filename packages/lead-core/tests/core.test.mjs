@@ -7,7 +7,9 @@ import {
   normalizeLead,
   parseCsv,
   qualifyLead,
-  rankIntroductionPaths
+  rankIntroductionPaths,
+  relationshipsFromCsv,
+  relationshipsFromJson
 } from "../src/index.mjs";
 
 test("CSV parser preserves commas and newlines inside quoted inquiry text", () => {
@@ -92,6 +94,37 @@ test("declined relationship paths are excluded", () => {
     { connectorId: "no", targetId: "buyer", relationshipStrength: 5, consentStatus: "declined" }
   ], { now: "2026-09-08" });
   assert.equal(ranked.length, 0);
+});
+
+test("relationship CSV imports owned relationship context and evidence", () => {
+  const [path] = relationshipsFromCsv(
+    "connector_id,connector_name,target_id,target_name,relationship_strength,last_contact_at,known_personally,shared_industry,consent_status,evidence_ids\nconnector-demo,林示例,target-demo,Northstar Demo,4,2026-08-28,是,true,approved,crm-demo-01|meeting-demo-02\n"
+  );
+  assert.equal(path.connectorName, "林示例");
+  assert.equal(path.targetName, "Northstar Demo");
+  assert.equal(path.relationshipStrength, 4);
+  assert.equal(path.knownPersonally, true);
+  assert.deepEqual(path.evidenceIds, ["crm-demo-01", "meeting-demo-02"]);
+});
+
+test("relationship JSON normalizes consent and never revives a declined path", () => {
+  const ranked = rankIntroductionPaths(relationshipsFromJson({ paths: [{
+    connector_id: "connector-demo",
+    target_id: "target-demo",
+    relationship_strength: 5,
+    known_personally: true,
+    consent_status: "DECLINED",
+    evidence_ids: "crm-demo"
+  }] }), { now: "2026-09-08" });
+  assert.equal(ranked.length, 0);
+});
+
+test("ranked relationship paths retain names and explain their evidence cap", () => {
+  const [result] = rankIntroductionPaths([{ connectorName: "林示例", targetName: "Northstar Demo", relationshipStrength: 5 }], { now: "2026-09-08" });
+  assert.equal(result.connectorName, "林示例");
+  assert.equal(result.targetName, "Northstar Demo");
+  assert.equal(result.score, 40);
+  assert.ok(result.reasons.some((reason) => reason.includes("最高 49 分")));
 });
 
 test("stable lead IDs are identical for the same input in browser-safe core", () => {

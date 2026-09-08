@@ -47,14 +47,15 @@ h1 em { color: var(--lime); font-weight: 500; }
 .hero-metric p { color: rgb(255 255 255 / 64%); line-height: 1.7; }
 
 main { width: min(1180px, calc(100% - 40px)); margin: -30px auto 80px; position: relative; }
-.import-panel, .dashboard { background: var(--card); border: 1px solid rgb(255 255 255 / 75%); border-radius: 22px; box-shadow: var(--shadow); padding: 34px; }
-.dashboard { margin-top: 24px; }
+.import-panel, .dashboard, .research-panel, .relationship-panel { background: var(--card); border: 1px solid rgb(255 255 255 / 75%); border-radius: 22px; box-shadow: var(--shadow); padding: 34px; }
+.dashboard, .research-panel, .relationship-panel { margin-top: 24px; }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .section-label { color: var(--forest); }
 h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(30px, 4vw, 46px); font-weight: 500; letter-spacing: -.035em; }
 
 .button { border: 0; border-radius: 999px; cursor: pointer; padding: 11px 18px; font-weight: 760; transition: transform .18s ease, box-shadow .18s ease; }
 .button:hover { transform: translateY(-1px); }
+.button:disabled { cursor: not-allowed; opacity: .48; transform: none; box-shadow: none; }
 .button.ghost { color: var(--forest); background: #e9eee8; }
 .button.primary { color: #fff; background: var(--forest); box-shadow: 0 9px 24px rgb(31 86 62 / 20%); }
 .channel-row { display: grid; grid-template-columns: auto minmax(190px, 260px) 1fr; align-items: center; gap: 12px; margin: -4px 0 18px; color: var(--ink); font-size: 13px; font-weight: 750; }
@@ -72,6 +73,8 @@ h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(3
 .results-heading { align-items: end; }
 .toolbar { display: flex; align-items: center; gap: 10px; }
 select { border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: #fff; padding: 10px 36px 10px 14px; }
+input { width: 100%; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: #fff; padding: 11px 13px; }
+input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-color: var(--forest); }
 .summary-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 18px; }
 .summary-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: #fff; }
 .summary-card span { display: block; color: var(--muted); font-size: 12px; font-weight: 760; }
@@ -99,6 +102,35 @@ select { border: 1px solid var(--line); border-radius: 999px; color: var(--ink);
 .evidence-toggle summary { color: var(--forest); cursor: pointer; font-weight: 700; font-size: 13px; }
 .evidence-list { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
 .empty { padding: 42px; text-align: center; color: var(--muted); }
+.bordered-empty { margin: 0; border: 1px dashed var(--line); border-radius: 14px; }
+
+.research-form { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(190px, .7fr) auto; gap: 12px; align-items: end; }
+.research-form label { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 760; }
+.research-form .button { min-height: 43px; }
+.privacy-note { margin: 15px 0 0; border-left: 3px solid var(--amber); padding: 1px 0 1px 12px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.research-results, .relationship-results { display: grid; gap: 12px; margin-top: 18px; }
+.company-card, .relationship-card { border: 1px solid var(--line); border-radius: 16px; background: #fff; padding: 20px; }
+.company-heading { display: flex; align-items: start; justify-content: space-between; gap: 18px; }
+.company-heading h3, .relationship-card h3 { margin: 1px 0 8px; font-size: 20px; }
+.evidence-badge, .consent { width: fit-content; border-radius: 999px; background: #f2efe8; padding: 6px 10px; color: #685f57; font-size: 12px; font-weight: 780; }
+.evidence-badge.verified, .consent-approved { color: var(--forest-dark); background: #e6f7da; }
+.fact-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 13px 24px; margin: 18px 0; }
+.fact-grid div { min-width: 0; }
+.fact-grid dt { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+.fact-grid dd { margin: 4px 0 0; line-height: 1.45; overflow-wrap: anywhere; }
+.source-link { color: var(--forest); font-size: 13px; font-weight: 760; }
+.company-card .evidence-toggle { margin-top: 16px; }
+
+.compact-drop-zone { display: grid; gap: 5px; border: 1.5px dashed #a8b3aa; border-radius: 16px; background: #f7f8f3; padding: 22px; cursor: pointer; }
+.compact-drop-zone:hover { border-color: var(--forest); background: #eef5ed; }
+.compact-drop-zone input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.compact-drop-zone small { color: var(--muted); line-height: 1.55; }
+.relationship-card { display: grid; grid-template-columns: 72px 1fr; gap: 18px; }
+.path-score { width: 62px; height: 62px; display: grid; place-items: center; align-content: center; border-radius: 14px; color: #fff; background: var(--forest); }
+.path-score strong { font-family: Georgia, serif; font-size: 26px; line-height: 1; }
+.path-score span { margin-top: 3px; font-size: 10px; }
+.consent { margin: 0 0 10px; }
+.path-reasons { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 
 .principles { padding: 70px 8px 0; }
 .principle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
@@ -116,6 +148,7 @@ footer { border-top: 1px solid var(--line); padding: 26px 20px 38px; color: var(
   .panel-heading, .results-heading { align-items: stretch; flex-direction: column; }
   .channel-row { grid-template-columns: 1fr; }
   .toolbar { flex-wrap: wrap; }
+  .research-form { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: repeat(3, 1fr); }
   .lead-card { grid-template-columns: 58px 1fr; }
   .score { grid-column: 2; text-align: left; }
@@ -128,7 +161,10 @@ footer { border-top: 1px solid var(--line); padding: 26px 20px 38px; color: var(
   .hero { padding-bottom: 52px; }
   h1 { font-size: 46px; }
   main { width: min(100% - 20px, 1180px); }
-  .import-panel, .dashboard { padding: 23px 18px; border-radius: 17px; }
+  .import-panel, .dashboard, .research-panel, .relationship-panel { padding: 23px 18px; border-radius: 17px; }
   .toolbar, .toolbar label, .toolbar select, .toolbar .button { width: 100%; }
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .company-heading { flex-direction: column; }
+  .fact-grid { grid-template-columns: 1fr; }
+  .relationship-card { grid-template-columns: 1fr; }
 }

@@ -88,6 +88,52 @@
         <div id="leadList" class="lead-list"></div>
       </section>
 
+      <section class="research-panel" aria-labelledby="company-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 03 · 企业核验</p>
+            <h2 id="company-title">查清这家公司是谁</h2>
+          </div>
+          <button id="exportCompanyEvidence" class="button ghost" type="button" disabled>导出核验证据</button>
+        </div>
+
+        <form id="companyResearchForm" class="research-form">
+          <label>
+            <span>企业法定名称</span>
+            <input id="companyQuery" name="q" type="search" minlength="2" maxlength="200" required placeholder="例如：Apple Inc." />
+          </label>
+          <label>
+            <span>司法辖区（可选）</span>
+            <input id="companyJurisdiction" name="jurisdiction" maxlength="20" placeholder="例如：US-CA / DE" />
+          </label>
+          <button id="searchCompany" class="button primary" type="submit">查询 GLEIF</button>
+        </form>
+        <p class="privacy-note">点击查询后，只会把企业名称和可选司法辖区发送给 GLEIF 官方接口；不会发送询盘正文或联系人信息。LEI 是企业身份线索，不是信用、付款能力或采购意愿保证。</p>
+        <p id="companyStatus" class="status" role="status" aria-live="polite">尚未查询企业。</p>
+        <div id="companyResults" class="research-results"></div>
+      </section>
+
+      <section class="relationship-panel" aria-labelledby="relationship-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 04 · 信任路径</p>
+            <h2 id="relationship-title">谁适合帮你建立信任</h2>
+          </div>
+          <div class="toolbar">
+            <button id="loadRelationshipSample" class="button ghost" type="button">使用虚构样例</button>
+            <button id="exportRelationshipPaths" class="button primary" type="button" disabled>导出候选路径</button>
+          </div>
+        </div>
+
+        <label class="compact-drop-zone" for="relationshipFile">
+          <input id="relationshipFile" type="file" accept=".csv,.json,text/csv,application/json" />
+          <strong>选择自有通讯录 / CRM 关系 CSV 或 JSON</strong>
+          <small>关系文件只在当前浏览器处理。已拒绝参与的人会被排除；公开的同公司、同校信息不等于认识或愿意背书。</small>
+        </label>
+        <p id="relationshipStatus" class="status" role="status" aria-live="polite">尚未导入关系记录。</p>
+        <div id="relationshipResults" class="relationship-results"></div>
+      </section>
+
       <section class="principles">
         <p class="section-label">系统不会替你做的事</p>
         <div class="principle-grid">

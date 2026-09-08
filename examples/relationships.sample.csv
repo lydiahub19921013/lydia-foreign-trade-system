@@ -1,0 +1,4 @@
+connector_id,connector_name,target_id,target_name,relationship_strength,last_contact_at,known_personally,shared_company,shared_industry,shared_education,consent_status,evidence_ids
+connector-demo-01,林示例,target-demo-01,Northstar Demo Imports,5,2026-08-28,true,true,true,false,approved,crm-demo-01|meeting-demo-01
+connector-demo-02,陈示例,target-demo-01,Northstar Demo Imports,3,2025-12-18,true,false,true,false,unknown,event-demo-02
+connector-demo-03,周示例,target-demo-02,Harbor Demo Trading,5,2026-08-30,true,true,false,false,declined,crm-demo-03

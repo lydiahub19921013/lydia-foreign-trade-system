@@ -1,0 +1,51 @@
+{
+  "system": {
+    "name": "Lydia 外贸系统",
+    "version": "0.12.0",
+    "sourceCommit": "c3f4f76848db5b18563b7f880c486b17b92c9c93",
+    "repository": "https://github.com/lydiahub19921013/lydia-foreign-trade-system",
+    "launchCommand": "npm run workbench"
+  },
+  "extension": {
+    "name": "外贸开发插件",
+    "version": "0.3.0",
+    "sourceCommit": "8fd84efed5a0cf2771db61784b973e1c62d55a21",
+    "artifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/foreign-trade-development-plugin/release/外贸开发插件-v0.3.0-chrome.zip",
+    "integratedArtifact": "/Users/macmini/Documents/ChatGPT/我的口播视频/outputs/lydia-foreign-trade-system/apps/communication-extension/release/外贸开发插件-v0.3.0-chrome.zip",
+    "sha256": "5893d2e26f4e2c33574b04badb949df6e8a124d67a92729c8ec3b1b07e0c3799",
+    "reproducibleBuildVerified": true,
+    "chromeUpgradeInstallVerified": false
+  },
+  "localPersistence": {
+    "snapshotFormat": "lydia-workbench-snapshot",
+    "snapshotSchemaVersion": 1,
+    "storage": "IndexedDB",
+    "databaseName": "lydia-foreign-trade-system",
+    "storeName": "workbench-snapshots",
+    "origin": "http://127.0.0.1:4173",
+    "stateWhitelistEnabled": true,
+    "uiWhitelistEnabled": true,
+    "consentConfirmationPersisted": false,
+    "applicationEncryptionEnabled": false,
+    "crossDeviceSyncEnabled": false,
+    "tenantIsolationEnabled": false
+  },
+  "verification": {
+    "systemTests": 109,
+    "extensionTests": 24,
+    "scannedTextFiles": 165,
+    "browserQaUsedFictionalDataOnly": true,
+    "browserLeadRestoreVerified": true,
+    "browserDevelopmentRestoreVerified": true,
+    "browserRapidWriteFinalStateVerified": true,
+    "browserProspectRestoreVerified": true,
+    "browserRelationshipRestoreVerified": true,
+    "browserConsentResetVerified": true,
+    "browserClearVerified": true,
+    "browserVisualQaVerified": true,
+    "browserClosedAndReopenedVerified": false,
+    "browserQuotaFailureVerified": false,
+    "realCustomerDataUsed": false
+  },
+  "verifiedAt": "2026-09-08T15:50:31+08:00"
+}

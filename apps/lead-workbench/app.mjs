@@ -1,19 +1,23 @@
 import {
   SCHEMA_VERSION,
+  CSV_IMPORT_FIELD_DEFINITIONS,
   DEVELOPMENT_EVENT_LABELS,
   assessEmailCandidates,
   checkCompanyDomainMatch,
   checkEmailCandidateLeadMatch,
+  createCsvImportAudit,
   createEvidence,
   enrichmentFromEvidenceSelection,
   findDuplicateCandidates,
   generateEmailCandidates,
   getDevelopmentState,
   initializeDevelopmentTracking,
+  inspectCsvImport,
   leadsFromCsv,
   listDuplicateDecisions,
   mergeEvidenceIntoLead,
   normalizeLead,
+  normalizeCsvImportAudit,
   createProspectSearchPlan,
   prospectToLead,
   prospectsFromCsv,
@@ -54,6 +58,7 @@ let currentRelationshipResult = null;
 let pendingEvidenceAction = null;
 let pendingDuplicateAction = null;
 let pendingDevelopmentLeadId = null;
+let pendingCsvImport = null;
 let workbenchPersistence = null;
 let workspaceIndex = null;
 let activeWorkspace = null;
@@ -192,15 +197,147 @@ function leadsFromJson(payload) {
 
 async function parseFile(file) {
   const text = await file.text();
-  if (file.name.toLowerCase().endsWith(".csv")) {
-    return leadsFromCsv(text, { channel: $("#channel").value });
-  }
   const payload = JSON.parse(text);
   assertPayloadWorkspace(payload);
-  return leadsFromJson(payload);
+  return {
+    leads: leadsFromJson(payload),
+    importReview: normalizedCsvImportAuditOrNull(payload.importReview)
+  };
 }
 
-function buildResult(leads, sourceFile) {
+function isCsvFile(file) {
+  return file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv";
+}
+
+function normalizedCsvImportAuditOrNull(value) {
+  if (!value) return null;
+  try {
+    return normalizeCsvImportAudit(value);
+  } catch {
+    return null;
+  }
+}
+
+function csvFieldMapFromDialog() {
+  return Object.fromEntries([...$("#csvMappingRows").querySelectorAll("select[data-source-header]")]
+    .map((select) => [select.dataset.sourceHeader, select.value]));
+}
+
+function renderCsvReviewState(report) {
+  $("#csvImportSummary").textContent = `${report.rowCount} 行数据 · ${report.usableRowCount} 行可形成客户记录 · ${report.mappedHeaderCount}/${report.mappings.length} 列已映射`;
+  const issueList = $("#csvImportIssues");
+  issueList.replaceChildren();
+  for (const message of report.errors) {
+    const item = document.createElement("li");
+    item.className = "csv-error";
+    item.textContent = message;
+    issueList.append(item);
+  }
+  for (const message of report.warnings) {
+    const item = document.createElement("li");
+    item.textContent = message;
+    issueList.append(item);
+  }
+  issueList.classList.toggle("hidden", !report.errors.length && !report.warnings.length);
+
+  const rows = [...$("#csvMappingRows").children];
+  report.mappings.forEach((mapping, index) => {
+    const row = rows[index];
+    if (!row) return;
+    row.dataset.status = mapping.status;
+    const label = row.querySelector(".csv-mapping-status");
+    label.textContent = mapping.status === "mapped"
+      ? "已识别"
+      : mapping.status === "duplicate-target" ? "同一字段有多列" : "不会导入";
+  });
+
+  $("#confirmCsvImport").disabled = !report.canImport;
+  if (report.canImport) {
+    updateStatus("#csvImportStatus", `可以导入 ${report.usableRowCount} 条记录；确认前请抽查下方原列、样例值和 Lydia 字段。`, "success");
+  } else {
+    updateStatus("#csvImportStatus", report.errors[0] || "请先修正字段映射。", "error");
+  }
+}
+
+function currentCsvReview() {
+  if (!pendingCsvImport) throw new Error("没有待核对的 CSV 文件");
+  return inspectCsvImport(pendingCsvImport.text, {
+    channel: pendingCsvImport.channel,
+    fieldMap: csvFieldMapFromDialog()
+  });
+}
+
+function refreshCsvReview() {
+  try {
+    renderCsvReviewState(currentCsvReview());
+  } catch (error) {
+    $("#confirmCsvImport").disabled = true;
+    updateStatus("#csvImportStatus", error.message || "字段映射不正确。", "error");
+  }
+}
+
+function csvFieldSelect(mapping) {
+  const select = document.createElement("select");
+  select.dataset.sourceHeader = mapping.header;
+  select.setAttribute("aria-label", `${mapping.header} 映射到 Lydia 字段`);
+  const ignored = document.createElement("option");
+  ignored.value = "";
+  ignored.textContent = "忽略此列";
+  select.append(ignored);
+  for (const definition of CSV_IMPORT_FIELD_DEFINITIONS) {
+    const option = document.createElement("option");
+    option.value = definition.field;
+    option.textContent = definition.label;
+    select.append(option);
+  }
+  if (mapping.field && ![...select.options].some((option) => option.value === mapping.field)) {
+    const technical = document.createElement("option");
+    technical.value = mapping.field;
+    technical.textContent = `Lydia 系统字段 · ${mapping.field}`;
+    select.append(technical);
+  }
+  select.value = mapping.field || "";
+  select.addEventListener("change", refreshCsvReview);
+  return select;
+}
+
+function openCsvImportReview(file, text) {
+  const channel = $("#channel").value;
+  const report = inspectCsvImport(text, { channel });
+  pendingCsvImport = { fileName: file.name, text, channel };
+  $("#csvImportFileName").textContent = file.name;
+  const mappingRows = $("#csvMappingRows");
+  mappingRows.replaceChildren();
+  for (const mapping of report.mappings) {
+    const row = document.createElement("div");
+    row.className = "csv-mapping-row";
+    const source = document.createElement("div");
+    source.className = "csv-source-column";
+    const header = document.createElement("strong");
+    header.textContent = mapping.header || "（空白表头）";
+    const sample = document.createElement("small");
+    sample.textContent = mapping.samples.length ? `样例：${mapping.samples.join(" ｜ ")}` : "这一列没有非空样例";
+    source.append(header, sample);
+    const status = document.createElement("span");
+    status.className = "csv-mapping-status";
+    row.append(source, csvFieldSelect(mapping), status);
+    mappingRows.append(row);
+  }
+  renderCsvReviewState(report);
+  const dialog = $("#csvImportDialog");
+  dialog.showModal();
+  dialog.scrollTop = 0;
+  mappingRows.scrollTop = 0;
+  $("#csvImportTitle").focus({ preventScroll: true });
+}
+
+function closeCsvImportReview() {
+  pendingCsvImport = null;
+  $("#leadFile").value = "";
+  $("#csvImportDialog").close();
+}
+
+function buildResult(leads, sourceFile, options = {}) {
   const generatedAt = new Date().toISOString();
   const normalizedLeads = initializeDevelopmentTracking(leads.map(normalizeLead), {
     capturedAt: generatedAt
@@ -211,6 +348,7 @@ function buildResult(leads, sourceFile) {
     product: "Lydia 外贸系统",
     generatedAt,
     sourceFile,
+    importReview: normalizedCsvImportAuditOrNull(options.importReview),
     count: normalizedLeads.length,
     duplicateCandidates: findDuplicateCandidates(normalizedLeads),
     duplicateDecisions: listDuplicateDecisions(normalizedLeads),
@@ -249,7 +387,9 @@ function restoreWorkbenchSnapshot(snapshot) {
     const storedResult = storedObject(stored.currentResult, "lydia-qualified-leads", "results");
     if (storedResult) {
       const leads = leadsFromJson(storedResult);
-      if (leads.length) currentResult = buildResult(leads, storedResult.sourceFile || "本机自动恢复");
+      if (leads.length) currentResult = buildResult(leads, storedResult.sourceFile || "本机自动恢复", {
+        importReview: storedResult.importReview
+      });
     }
     currentProspectPlan = stored.currentProspectPlan?.queries?.length ? stored.currentProspectPlan : null;
     currentProspectResult = storedObject(stored.currentProspectResult, "lydia-public-prospects", "prospects");
@@ -274,7 +414,10 @@ function restoreWorkbenchSnapshot(snapshot) {
       renderSummary();
       renderLeads();
       $("#dashboard").classList.remove("hidden");
-      setStatus(`已从这个浏览器恢复 ${currentResult.count} 条询盘和开发记录。`, "success");
+      const reviewNote = currentResult.importReview
+        ? `；原导入已核对 ${currentResult.importReview.mappings.length} 列映射`
+        : "";
+      setStatus(`已从这个浏览器恢复 ${currentResult.count} 条询盘和开发记录${reviewNote}。`, "success");
     }
     if (currentProspectPlan) renderProspectPlan(currentProspectPlan);
     if (currentProspectResult) renderProspectResults();
@@ -1101,13 +1244,16 @@ function renderLeads() {
   list.append(...results.map(leadCard));
 }
 
-function showResult(leads, sourceFile) {
-  currentResult = buildResult(leads, sourceFile);
+function showResult(leads, sourceFile, options = {}) {
+  currentResult = buildResult(leads, sourceFile, options);
   populateResearchLeadTargets();
   renderSummary();
   renderLeads();
   $("#dashboard").classList.remove("hidden");
-  setStatus(`已在本机完成 ${leads.length} 条询盘分级。请人工复核来源和高优先级客户。`, "success");
+  const mappingNote = currentResult.importReview
+    ? `已核对 ${currentResult.importReview.mappings.length} 列映射。`
+    : "";
+  setStatus(`已在本机完成 ${leads.length} 条询盘分级。${mappingNote}请人工复核来源和高优先级客户。`, "success");
   $("#dashboard").scrollIntoView({ behavior: "smooth", block: "start" });
   schedulePersistence();
 }
@@ -1115,11 +1261,20 @@ function showResult(leads, sourceFile) {
 async function loadSelectedFile(file) {
   if (!file) return;
   try {
+    if (file.size > 25 * 1024 * 1024) throw new Error("询盘文件不能超过 25 MB");
     setStatus(`正在读取 ${file.name}……`);
-    const leads = await parseFile(file);
-    if (!leads.length) throw new Error("文件中没有可识别的询盘");
-    showResult(leads, file.name);
+    if (isCsvFile(file)) {
+      const text = await file.text();
+      openCsvImportReview(file, text);
+      setStatus(`${file.name} 已在本机读取，等待字段核对；尚未写入当前客户空间。`);
+      return;
+    }
+    const parsed = await parseFile(file);
+    if (!parsed.leads.length) throw new Error("文件中没有可识别的询盘");
+    showResult(parsed.leads, file.name, { importReview: parsed.importReview });
   } catch (error) {
+    pendingCsvImport = null;
+    $("#leadFile").value = "";
     setStatus(error.message || "导入失败，请检查文件格式。", "error");
   }
 }
@@ -1941,6 +2096,33 @@ $("#exportProspects").addEventListener("click", () => {
 });
 
 $("#leadFile").addEventListener("change", (event) => loadSelectedFile(event.target.files[0]));
+$("#csvImportForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  try {
+    const report = currentCsvReview();
+    if (!report.canImport) throw new Error(report.errors[0] || "字段核对尚未通过");
+    const { text, channel, fileName } = pendingCsvImport;
+    const fieldMap = csvFieldMapFromDialog();
+    const leads = leadsFromCsv(text, { channel, fieldMap });
+    if (!leads.length) throw new Error("文件中没有可识别的询盘");
+    const importReview = createCsvImportAudit(report);
+    pendingCsvImport = null;
+    $("#leadFile").value = "";
+    $("#csvImportDialog").close();
+    showResult(leads, fileName, { importReview });
+  } catch (error) {
+    updateStatus("#csvImportStatus", error.message || "CSV 导入失败。", "error");
+  }
+});
+$("#cancelCsvImport").addEventListener("click", () => {
+  closeCsvImportReview();
+  setStatus("已取消 CSV 导入，当前客户空间没有变化。");
+});
+$("#csvImportDialog").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeCsvImportReview();
+  setStatus("已取消 CSV 导入，当前客户空间没有变化。");
+});
 $("#gradeFilter").addEventListener("change", () => {
   renderLeads();
   schedulePersistence();
@@ -1954,7 +2136,8 @@ $("#loadSample").addEventListener("click", async () => {
   try {
     const response = await fetch("/examples/inquiries.sample.csv");
     if (!response.ok) throw new Error("无法读取虚构样例");
-    showResult(leadsFromCsv(await response.text(), { channel: "auto" }), "inquiries.sample.csv");
+    openCsvImportReview({ name: "inquiries.sample.csv" }, await response.text());
+    setStatus("虚构样例已在本机读取，等待字段核对；尚未写入当前客户空间。");
   } catch (error) {
     setStatus(error.message, "error");
   }

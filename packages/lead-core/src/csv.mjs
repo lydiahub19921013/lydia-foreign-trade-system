@@ -23,6 +23,63 @@ const FIELD_ALIASES = {
   notes: ["notes", "remark", "remarks", "备注"]
 };
 
+export const CSV_IMPORT_FIELD_DEFINITIONS = Object.freeze([
+  ["source", "渠道来源"],
+  ["source_reference", "询盘编号或链接"],
+  ["received_at", "收到时间"],
+  ["company_name", "企业名称"],
+  ["domain", "企业域名"],
+  ["website", "企业官网"],
+  ["country", "国家或地区"],
+  ["address", "企业地址"],
+  ["industry", "行业或业务类型"],
+  ["employee_range", "员工规模"],
+  ["registration_id", "企业登记编号"],
+  ["factory_info", "工厂或产能信息"],
+  ["contact_name", "联系人姓名"],
+  ["contact_role", "联系人职位"],
+  ["email", "工作邮箱候选"],
+  ["whatsapp", "WhatsApp 候选"],
+  ["phone", "联系电话候选"],
+  ["message", "原始询盘内容"],
+  ["product", "产品"],
+  ["quantity", "采购数量"],
+  ["timeline", "采购或交期"],
+  ["budget", "预算或目标价格"],
+  ["notes", "备注"]
+].map(([field, label]) => Object.freeze({ field, label })));
+
+const SUPPORTED_IMPORT_FIELDS = new Set([
+  ...CSV_IMPORT_FIELD_DEFINITIONS.map(({ field }) => field),
+  "id",
+  "observed_at",
+  "explicit_inquiry",
+  "replied",
+  "requested_quote",
+  "requested_sample",
+  "purchase_order",
+  "mutual_introduction",
+  "prior_relationship",
+  "do_not_contact",
+  "restricted_market",
+  "duplicate_of",
+  "consent_status",
+  ...["website", "registration_id", "factory_info", "email", "whatsapp", "phone"]
+    .flatMap((field) => [`${field}_status`, `${field}_confidence`])
+]);
+
+const MEANINGFUL_IMPORT_FIELDS = new Set([
+  "source_reference",
+  "company_name",
+  "website",
+  "contact_name",
+  "email",
+  "whatsapp",
+  "phone",
+  "message",
+  "product"
+]);
+
 function normalizedHeader(value) {
   return String(value || "")
     .trim()
@@ -37,10 +94,28 @@ const aliasIndex = new Map(
   )
 );
 
+function mappedField(header, fieldMap) {
+  if (fieldMap && typeof fieldMap === "object" && Object.hasOwn(fieldMap, header)) {
+    const explicit = String(fieldMap[header] ?? "").trim();
+    if (!explicit) return { field: null, explicit: true };
+    if (!SUPPORTED_IMPORT_FIELDS.has(explicit)) throw new Error(`不支持的 Lydia 字段：${explicit}`);
+    return { field: explicit, explicit: true };
+  }
+  const alias = aliasIndex.get(normalizedHeader(header));
+  if (alias) return { field: alias, explicit: false };
+  const canonical = String(header || "").trim();
+  return {
+    field: SUPPORTED_IMPORT_FIELDS.has(canonical) ? canonical : null,
+    explicit: false
+  };
+}
+
 export function canonicalizeFlatRecord(record, options = {}) {
   const canonical = {};
   for (const [header, value] of Object.entries(record || {})) {
-    const field = aliasIndex.get(normalizedHeader(header)) || header;
+    const resolved = mappedField(header, options.fieldMap);
+    if (resolved.explicit && !resolved.field) continue;
+    const field = resolved.field || header;
     if (canonical[field] === undefined || canonical[field] === "") canonical[field] = value;
   }
 
@@ -51,15 +126,16 @@ export function canonicalizeFlatRecord(record, options = {}) {
   return canonical;
 }
 
-export function parseCsv(text) {
+function parseCsvRows(text) {
+  const source = String(text ?? "");
   const rows = [];
   let row = [];
   let field = "";
   let quoted = false;
 
-  for (let index = 0; index < text.length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
     if (char === '"' && quoted && next === '"') {
       field += '"';
       index += 1;
@@ -79,16 +155,180 @@ export function parseCsv(text) {
     }
   }
 
+  if (quoted) throw new Error("CSV 中有未闭合的引号，请先修正原文件");
+
   if (field.length || row.length) {
     row.push(field);
     if (row.some((value) => value.trim())) rows.push(row);
   }
-  if (!rows.length) return [];
+  return rows;
+}
+
+function parseCsvDocument(text) {
+  const rows = parseCsvRows(text);
+  if (!rows.length) return { headers: [], values: [], records: [] };
 
   const headers = rows.shift().map((header) => header.trim().replace(/^\uFEFF/, ""));
-  return rows.map((values) => Object.fromEntries(
+  const records = rows.map((values) => Object.fromEntries(
     headers.map((header, index) => [header, values[index]?.trim() || ""])
   ));
+  return { headers, values: rows, records };
+}
+
+export function parseCsv(text) {
+  return parseCsvDocument(text).records;
+}
+
+function sampleValues(values, columnIndex) {
+  return [...new Set(values
+    .map((row) => String(row[columnIndex] ?? "").trim())
+    .filter(Boolean)
+    .map((value) => value.length > 80 ? `${value.slice(0, 79)}…` : value))]
+    .slice(0, 2);
+}
+
+export function inspectCsvImport(text, options = {}) {
+  const document = parseCsvDocument(text);
+  const normalizedHeaders = document.headers.map(normalizedHeader);
+  const duplicateHeaderNames = [...new Set(document.headers.filter((header, index) => {
+    const normalized = normalizedHeaders[index];
+    return normalized && normalizedHeaders.indexOf(normalized) !== index;
+  }))];
+  const mappings = document.headers.map((header, index) => {
+    const resolved = mappedField(header, options.fieldMap);
+    return {
+      header,
+      field: resolved.field,
+      explicit: resolved.explicit,
+      populatedRows: document.values.filter((row) => String(row[index] ?? "").trim()).length,
+      samples: sampleValues(document.values, index)
+    };
+  });
+  const targetCounts = new Map();
+  for (const { field } of mappings) {
+    if (field) targetCounts.set(field, (targetCounts.get(field) || 0) + 1);
+  }
+  for (const mapping of mappings) {
+    mapping.status = !mapping.field
+      ? "unmapped"
+      : targetCounts.get(mapping.field) > 1 ? "duplicate-target" : "mapped";
+  }
+
+  const canonicalRecords = document.records.map((record) => canonicalizeFlatRecord(record, options));
+  const usableRows = canonicalRecords.filter((record) => [...MEANINGFUL_IMPORT_FIELDS]
+    .some((field) => String(record[field] ?? "").trim()));
+  const missingSourceReferenceRows = usableRows.filter((record) => !String(record.source_reference ?? "").trim()).length;
+  const missingInquiryRows = usableRows.filter((record) => !String(record.message ?? "").trim()
+    && !String(record.product ?? "").trim()).length;
+  const missingOrganizationRows = usableRows.filter((record) => !["company_name", "domain", "website"]
+    .some((field) => String(record[field] ?? "").trim())).length;
+  const missingContactRows = usableRows.filter((record) => !["contact_name", "email", "whatsapp", "phone"]
+    .some((field) => String(record[field] ?? "").trim())).length;
+  const unmappedHeaders = mappings.filter((mapping) => !mapping.field && mapping.populatedRows > 0).map((mapping) => mapping.header);
+  const duplicateTargets = [...targetCounts.entries()].filter(([, count]) => count > 1).map(([field]) => field);
+  const shortRows = document.values.filter((row) => row.length < document.headers.length).length;
+  const longRows = document.values.filter((row) => row.length > document.headers.length).length;
+  const errors = [];
+  const warnings = [];
+
+  if (!document.headers.length) errors.push("CSV 没有表头");
+  if (document.headers.some((header) => !normalizedHeader(header))) errors.push("CSV 存在空白表头");
+  if (duplicateHeaderNames.length) errors.push(`CSV 存在重复表头：${duplicateHeaderNames.join("、")}`);
+  if (!document.values.length) errors.push("CSV 没有数据行");
+  if (!mappings.some((mapping) => mapping.field)) errors.push("尚未识别任何 Lydia 字段，请至少映射一个客户或询盘字段");
+  if (document.values.length && !usableRows.length) errors.push("数据行里没有可识别的客户身份、联系方式或询盘内容");
+  if (unmappedHeaders.length) warnings.push(`${unmappedHeaders.length} 列尚未映射，不会进入客户档案`);
+  if (duplicateTargets.length) warnings.push(`${duplicateTargets.length} 个 Lydia 字段由多列提供；每行优先使用靠左的非空值`);
+  if (shortRows) warnings.push(`${shortRows} 行末尾缺少部分单元格，缺失值会按空白处理`);
+  if (longRows) warnings.push(`${longRows} 行比表头多出单元格，多余值不会导入`);
+  if ((options.channel || "auto") === "auto" && !targetCounts.has("source")) {
+    warnings.push("没有渠道来源列且当前选择自动识别，导入后来源会记为 manual");
+  }
+  if (missingSourceReferenceRows) warnings.push(`${missingSourceReferenceRows} 条可用记录没有来源编号或链接，后续追溯和去重会变弱`);
+  if (missingInquiryRows) warnings.push(`${missingInquiryRows} 条可用记录没有询盘正文或产品，需求判断会受限`);
+  if (missingOrganizationRows) warnings.push(`${missingOrganizationRows} 条可用记录没有企业名称、域名或官网，企业背调会受限`);
+  if (missingContactRows) warnings.push(`${missingContactRows} 条可用记录没有联系人或联系方式，后续开发会受限`);
+
+  return {
+    format: "lydia-csv-import-review",
+    schemaVersion: 1,
+    channel: options.channel || "auto",
+    rowCount: document.values.length,
+    usableRowCount: usableRows.length,
+    mappedHeaderCount: mappings.filter((mapping) => mapping.field).length,
+    mappedFields: [...targetCounts.keys()],
+    blankHeaderCount: document.headers.filter((header) => !normalizedHeader(header)).length,
+    duplicateHeaders: duplicateHeaderNames,
+    unmappedHeaders,
+    duplicateTargets,
+    shortRowCount: shortRows,
+    longRowCount: longRows,
+    missingSourceReferenceRows,
+    missingInquiryRows,
+    missingOrganizationRows,
+    missingContactRows,
+    mappings,
+    errors,
+    warnings,
+    canImport: errors.length === 0
+  };
+}
+
+export function normalizeCsvImportAudit(input) {
+  if (!input || typeof input !== "object" || input.format !== "lydia-csv-import-audit") {
+    throw new Error("CSV 导入核对记录格式不正确");
+  }
+  const schemaVersion = Number(input.schemaVersion);
+  if (!Number.isInteger(schemaVersion) || schemaVersion < 1) throw new Error("CSV 导入核对记录缺少有效版本");
+  if (schemaVersion > 1) throw new Error("CSV 导入核对记录来自更新版本，请先升级 Lydia 外贸系统");
+  const reviewedAt = new Date(input.reviewedAt);
+  if (Number.isNaN(reviewedAt.valueOf())) throw new Error("CSV 导入核对时间无效");
+  return {
+    format: "lydia-csv-import-audit",
+    schemaVersion,
+    reviewedAt: reviewedAt.toISOString(),
+    channel: String(input.channel || "auto").trim().slice(0, 40) || "auto",
+    rowCount: Math.max(0, Number.parseInt(input.rowCount, 10) || 0),
+    usableRowCount: Math.max(0, Number.parseInt(input.usableRowCount, 10) || 0),
+    mappings: (Array.isArray(input.mappings) ? input.mappings : []).map((mapping) => {
+      const field = SUPPORTED_IMPORT_FIELDS.has(mapping?.field) ? mapping.field : null;
+      const status = ["mapped", "unmapped", "duplicate-target"].includes(mapping?.status)
+        ? mapping.status
+        : field ? "mapped" : "unmapped";
+      return {
+        header: String(mapping?.header ?? "").trim().slice(0, 200),
+        field,
+        status,
+        populatedRows: Math.max(0, Number.parseInt(mapping?.populatedRows, 10) || 0)
+      };
+    }).slice(0, 200),
+    warnings: (Array.isArray(input.warnings) ? input.warnings : [])
+      .map((warning) => String(warning ?? "").trim().slice(0, 300))
+      .filter(Boolean)
+      .slice(0, 50)
+  };
+}
+
+export function createCsvImportAudit(report, options = {}) {
+  if (!report || typeof report !== "object" || report.format !== "lydia-csv-import-review") {
+    throw new Error("请先完成 CSV 导入核对");
+  }
+  if (!report.canImport) throw new Error("CSV 字段核对尚未通过，不能生成导入记录");
+  return normalizeCsvImportAudit({
+    format: "lydia-csv-import-audit",
+    schemaVersion: 1,
+    reviewedAt: options.reviewedAt || Date.now(),
+    channel: report.channel,
+    rowCount: report.rowCount,
+    usableRowCount: report.usableRowCount,
+    mappings: report.mappings.map(({ header, field, status, populatedRows }) => ({
+      header,
+      field,
+      status,
+      populatedRows
+    })),
+    warnings: report.warnings
+  });
 }
 
 function status(value) {

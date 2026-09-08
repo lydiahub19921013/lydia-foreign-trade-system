@@ -25,6 +25,8 @@ test("workbench server serves the local UI and browser-safe core", async () => {
     assert.match(html, /新建客户空间/);
     assert.match(html, /导出完整备份/);
     assert.match(html, /恢复完整备份/);
+    assert.match(html, /导入前核对/);
+    assert.match(html, /确认映射并导入/);
     assert.match(html, /\/apps\/lead-workbench\/app\.mjs/);
 
     const stylesheet = await fetch(`${origin}/apps/lead-workbench/styles.css`);

@@ -175,7 +175,15 @@ test("exports carry a customer-space marker and mismatched imports fail closed",
 
 test("full workspace backups are versioned, whitelisted and detached", () => {
   const state = {
-    currentResult: { count: 4 },
+    currentResult: {
+      count: 4,
+      importReview: {
+        format: "lydia-csv-import-audit",
+        schemaVersion: 1,
+        reviewedAt: "2026-09-08T10:59:00.000Z",
+        mappings: [{ header: "Company", field: "company_name" }]
+      }
+    },
     currentRelationshipResult: {
       paths: [{
         id: "path-1",
@@ -197,6 +205,7 @@ test("full workspace backups are versioned, whitelisted and detached", () => {
   assert.equal(backup.schemaVersion, 1);
   assert.equal(backup.workspace.name, "客户 A");
   assert.equal(backup.snapshot.state.currentResult.count, 4);
+  assert.equal(backup.snapshot.state.currentResult.importReview.mappings[0].field, "company_name");
   assert.deepEqual(backup.snapshot.state.currentRelationshipResult.paths[0].evidence, { note: "safe" });
   assert.equal(backup.snapshot.state.ui.channel, "alibaba");
   assert.equal(JSON.stringify(backup).includes("must-not-persist"), false);

@@ -1,6 +1,15 @@
 export { SCHEMA_VERSION, createEvidence, normalizeLead } from "./model.mjs";
 export { qualifyLead } from "./scoring.mjs";
-export { canonicalizeFlatRecord, leadFromFlatRecord, leadsFromCsv, parseCsv } from "./csv.mjs";
+export {
+  CSV_IMPORT_FIELD_DEFINITIONS,
+  canonicalizeFlatRecord,
+  createCsvImportAudit,
+  inspectCsvImport,
+  leadFromFlatRecord,
+  leadsFromCsv,
+  normalizeCsvImportAudit,
+  parseCsv
+} from "./csv.mjs";
 export {
   normalizeRelationshipPath,
   rankIntroductionPaths,

@@ -317,6 +317,27 @@
       </section>
     </main>
 
+    <dialog id="csvImportDialog" class="evidence-dialog csv-import-dialog" aria-labelledby="csvImportTitle">
+      <form id="csvImportForm" method="dialog">
+        <p class="section-label">导入前核对</p>
+        <h2 id="csvImportTitle" tabindex="-1">确认每一列放到哪里</h2>
+        <p class="dialog-description"><strong id="csvImportFileName"></strong> 只在当前浏览器读取。确认前不会写入客户空间；样例值只用于你判断列含义。</p>
+        <div id="csvImportSummary" class="csv-import-summary"></div>
+        <div class="csv-mapping-heading" aria-hidden="true">
+          <span>原文件列与样例</span>
+          <span>Lydia 字段</span>
+          <span>状态</span>
+        </div>
+        <div id="csvMappingRows" class="csv-mapping-rows"></div>
+        <ul id="csvImportIssues" class="csv-import-issues"></ul>
+        <p id="csvImportStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelCsvImport" class="button ghost" type="button">取消，不导入</button>
+          <button id="confirmCsvImport" class="button primary" type="submit">确认映射并导入</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="evidenceReviewDialog" class="evidence-dialog" aria-labelledby="evidenceDialogTitle">
       <form id="evidenceReviewForm" method="dialog">
         <p class="section-label">证据复核</p>

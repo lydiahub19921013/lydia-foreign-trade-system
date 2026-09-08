@@ -1,6 +1,6 @@
 {
   "name": "foreign-trade-development-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "个人独立的 Chrome 外贸沟通辅助工具",
   "type": "module",

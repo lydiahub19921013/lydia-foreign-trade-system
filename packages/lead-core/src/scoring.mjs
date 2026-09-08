@@ -3,7 +3,10 @@ import { normalizeLead } from "./model.mjs";
 function hasVerifiedEvidence(lead, kinds) {
   const accepted = new Set(kinds);
   return lead.evidence.some((item) =>
-    accepted.has(item.kind) && item.status === "verified" && item.sourceRef
+    accepted.has(item.kind)
+    && item.status === "verified"
+    && item.review?.decision !== "rejected"
+    && item.sourceRef
   );
 }
 

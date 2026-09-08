@@ -95,19 +95,68 @@ test("only an original-page-reviewed prospect can enter the development queue", 
     product: "Reusable bottle",
     market: "Exampleland"
   });
-  assert.throws(() => prospectToLead(prospect, { finalUrl: "https://northstar.example" }), /人工核查/);
+  assert.throws(() => prospectToLead(prospect, { reviewedPageUrl: "https://northstar.example" }), /人工核查/);
 
   const lead = prospectToLead(prospect, {
-    finalUrl: "https://northstar.example/about",
+    reviewedPageUrl: "https://northstar.example/about",
     originalPageReviewed: true,
-    title: "Northstar Demo Distribution",
-    addresses: ["1 Example Road"],
-    contacts: { emails: ["sales@northstar.example"], phones: ["+1-555-0100"], whatsapp: [] },
-    evidence: [{ kind: "company-website", value: "Northstar", sourceRef: "https://northstar.example/about", status: "candidate" }]
+    organization: { website: "https://northstar.example/about", address: "1 Example Road" },
+    contact: { email: "sales@northstar.example", phone: "+1-555-0100" },
+    evidence: [
+      { id: "site", kind: "company-website", value: "https://northstar.example/about", sourceRef: "https://northstar.example/about", status: "candidate" },
+      { id: "email", kind: "business-email", value: "sales@northstar.example", sourceRef: "https://northstar.example/contact", status: "candidate" },
+      { id: "phone", kind: "business-phone", value: "+1-555-0100", sourceRef: "https://northstar.example/contact", status: "candidate" },
+      { id: "address", kind: "business-address", value: "1 Example Road", sourceRef: "https://northstar.example/about", status: "candidate" }
+    ],
+    fieldEvidence: {
+      "organization.website": "site",
+      "organization.address": "address",
+      "contact.email": "email",
+      "contact.phone": "phone"
+    },
+    reviewedAt: "2026-09-08T00:00:00Z"
   });
   assert.equal(lead.source, "Public research");
   assert.equal(lead.organization.domain, "northstar.example");
   assert.equal(lead.contact.email, "sales@northstar.example");
+  assert.ok(lead.fieldOrigins.some((item) => item.path === "contact.email" && item.evidenceId === "email"));
   assert.equal(lead.signals.explicitInquiry, false);
   assert.match(lead.notes, /不是客户主动询盘/);
+});
+
+test("unselected website fields never leak into the development queue", () => {
+  const prospect = normalizePublicProspect({
+    companyName: "Northstar Demo Distribution",
+    sourceUrl: "https://directory.example/northstar",
+    signalExcerpt: "Public candidate signal",
+    product: "Reusable bottle"
+  });
+  const lead = prospectToLead(prospect, {
+    reviewedPageUrl: "https://northstar.example/about",
+    finalUrl: "https://northstar.example/about",
+    title: "Unselected website title",
+    addresses: ["Unselected address"],
+    originalPageReviewed: true,
+    contact: { email: "sales@northstar.example" },
+    evidence: [{ id: "selected-email", kind: "business-email", value: "sales@northstar.example", sourceRef: "https://northstar.example/contact", status: "candidate" }],
+    fieldEvidence: { "contact.email": "selected-email" }
+  });
+  assert.equal(lead.organization.website, null);
+  assert.equal(lead.organization.address, null);
+  assert.equal(lead.contact.email, "sales@northstar.example");
+  assert.equal(lead.evidence.some((item) => item.value === "Unselected website title"), false);
+});
+
+test("a reviewed page from another company cannot enter the prospect queue", () => {
+  const prospect = normalizePublicProspect({
+    companyName: "Northstar Demo Distribution",
+    companyDomain: "northstar.example",
+    sourceUrl: "https://directory.example/northstar",
+    signalExcerpt: "Public candidate signal"
+  });
+  assert.throws(() => prospectToLead(prospect, {
+    reviewedPageUrl: "https://other.example/about",
+    originalPageReviewed: true,
+    evidence: [{ id: "other", kind: "company-website", value: "https://other.example/about", sourceRef: "https://other.example/about" }]
+  }), /域名不一致/);
 });

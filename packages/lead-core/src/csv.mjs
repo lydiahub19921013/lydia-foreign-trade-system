@@ -99,8 +99,8 @@ function status(value) {
 }
 
 function addImportedEvidence(record, evidence, field, kind, sourceRef) {
-  if (!record[field]) return;
-  evidence.push(createEvidence({
+  if (!record[field]) return null;
+  const item = createEvidence({
     kind,
     value: record[field],
     sourceRef,
@@ -108,13 +108,28 @@ function addImportedEvidence(record, evidence, field, kind, sourceRef) {
     status: status(record[`${field}_status`]),
     confidence: record[`${field}_confidence`] || undefined,
     note: "由 Lydia 导入模板生成"
-  }));
+  });
+  evidence.push(item);
+  return item;
+}
+
+function addImportedField(record, evidence, fieldOrigins, field, kind, path, sourceRef) {
+  const item = addImportedEvidence(record, evidence, field, kind, sourceRef);
+  if (!item) return;
+  fieldOrigins.push({
+    path,
+    evidenceId: item.id,
+    appliedValue: record[field],
+    appliedAt: item.observedAt,
+    active: true
+  });
 }
 
 export function leadFromFlatRecord(input, options = {}) {
   const record = canonicalizeFlatRecord(input, options);
   const sourceRef = record.source_reference || record.inquiry_url || record.inquiry_id || null;
   const evidence = [];
+  const fieldOrigins = [];
 
   if (sourceRef) {
     evidence.push(createEvidence({
@@ -126,12 +141,12 @@ export function leadFromFlatRecord(input, options = {}) {
       confidence: 1
     }));
   }
-  addImportedEvidence(record, evidence, "website", "company-website", sourceRef);
-  addImportedEvidence(record, evidence, "registration_id", "business-registration", sourceRef);
-  addImportedEvidence(record, evidence, "factory_info", "factory", sourceRef);
-  addImportedEvidence(record, evidence, "email", "business-email", sourceRef);
-  addImportedEvidence(record, evidence, "whatsapp", "whatsapp", sourceRef);
-  addImportedEvidence(record, evidence, "phone", "business-phone", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "website", "company-website", "organization.website", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "registration_id", "business-registration", "organization.registrationId", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "factory_info", "factory", "organization.factoryInfo", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "email", "business-email", "contact.email", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "whatsapp", "whatsapp", "contact.whatsapp", sourceRef);
+  addImportedField(record, evidence, fieldOrigins, "phone", "business-phone", "contact.phone", sourceRef);
 
   return normalizeLead({
     id: record.id,
@@ -173,6 +188,7 @@ export function leadFromFlatRecord(input, options = {}) {
       priorRelationship: record.prior_relationship
     },
     evidence,
+    fieldOrigins,
     compliance: {
       doNotContact: record.do_not_contact,
       restrictedMarket: record.restricted_market,

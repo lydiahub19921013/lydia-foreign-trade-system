@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import {
+  SCHEMA_VERSION,
   findDuplicateCandidates,
   leadsFromCsv,
   qualifyLead
@@ -16,7 +17,7 @@ test("sample inquiries travel from qualification core into the communication ext
   const leads = leadsFromCsv(csv);
   const payload = {
     format: "lydia-qualified-leads",
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     product: "Lydia 外贸系统",
     generatedAt: "2026-09-08T00:00:00.000Z",
     sourceFile: "inquiries.sample.csv",
@@ -32,7 +33,7 @@ test("sample inquiries travel from qualification core into the communication ext
 
   assert.equal(imported.importedCount, 3);
   assert.equal(imported.updatedCount, 0);
-  assert.equal(imported.state.schemaVersion, 2);
+  assert.equal(imported.state.schemaVersion, 3);
   const first = imported.state.customers.find((customer) => customer.company === "Northstar Demo Imports");
   assert.equal(first.leadProfile.grade, "B");
   assert.equal(first.leadProfile.score, 71);

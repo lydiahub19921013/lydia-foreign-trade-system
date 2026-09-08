@@ -54,15 +54,16 @@ test("migration caps stored histories", () => {
   assert.equal(migrateState(state).replyHistory.length, 200);
 });
 
-test("old customer data migrates to schema 2 without losing fields", () => {
+test("old customer data migrates to schema 3 without losing fields", () => {
   const migrated = migrateState({
     schemaVersion: 1,
     customers: [{ id: "old", name: "Ana", company: "Example" }]
   });
-  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.schemaVersion, 3);
   assert.equal(migrated.customers[0].name, "Ana");
   assert.equal(migrated.customers[0].email, "");
   assert.equal(migrated.customers[0].leadProfile, null);
+  assert.deepEqual(migrated.customers[0].leadManagedFields, {});
 });
 
 test("imports Lydia qualified leads while preserving existing manual notes", () => {
@@ -103,4 +104,54 @@ test("rejects unrelated lead files", () => {
     () => importQualifiedLeads({ format: "other", results: [] }, createInitialState()),
     /Lydia 客户分级/
   );
+});
+
+test("a later Lydia import clears only an unchanged Lydia-managed email", () => {
+  const payload = {
+    format: "lydia-qualified-leads",
+    results: [{
+      lead: {
+        id: "lead_managed",
+        organization: { name: "Managed Demo" },
+        contact: { email: "candidate@managed.example" },
+        evidence: [{ id: "email", status: "candidate" }]
+      },
+      qualification: { grade: "C", score: 40, missingEvidence: [], nextAction: "人工复核" }
+    }]
+  };
+  const first = importQualifiedLeads(payload, createInitialState(), "2026-09-08T00:00:00.000Z");
+  assert.equal(first.state.customers[0].leadManagedFields.email, "candidate@managed.example");
+
+  const rejectedPayload = structuredClone(payload);
+  rejectedPayload.results[0].lead.contact.email = null;
+  rejectedPayload.results[0].lead.evidence[0].review = { decision: "rejected" };
+  const second = importQualifiedLeads(rejectedPayload, first.state, "2026-09-08T01:00:00.000Z");
+  assert.equal(second.state.customers[0].email, "");
+  assert.equal(second.state.customers[0].leadManagedFields.email, undefined);
+  assert.equal(second.state.customers[0].leadProfile.evidenceCount, 0);
+});
+
+test("manual plugin edits survive later Lydia evidence rollback", () => {
+  const payload = {
+    format: "lydia-qualified-leads",
+    results: [{
+      lead: {
+        id: "lead_manual",
+        organization: { name: "Manual Demo" },
+        contact: { email: "candidate@manual.example" },
+        evidence: [{ id: "email", status: "candidate" }]
+      },
+      qualification: { grade: "C", score: 40, missingEvidence: [], nextAction: "人工复核" }
+    }]
+  };
+  const imported = importQualifiedLeads(payload, createInitialState(), "2026-09-08T00:00:00.000Z");
+  const customer = imported.state.customers[0];
+  const edited = upsertCustomer(imported.state, { ...customer, email: "manual@manual.example" }, "2026-09-08T00:30:00.000Z");
+  assert.equal(edited.state.customers[0].leadManagedFields.email, undefined);
+
+  const rejectedPayload = structuredClone(payload);
+  rejectedPayload.results[0].lead.contact.email = null;
+  rejectedPayload.results[0].lead.evidence[0].review = { decision: "rejected" };
+  const reimported = importQualifiedLeads(rejectedPayload, edited.state, "2026-09-08T01:00:00.000Z");
+  assert.equal(reimported.state.customers[0].email, "manual@manual.example");
 });

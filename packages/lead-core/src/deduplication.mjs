@@ -21,7 +21,7 @@ function normalizedName(value) {
 function verifiedValues(lead, kinds) {
   const accepted = new Set(kinds);
   return lead.evidence
-    .filter((item) => accepted.has(item.kind) && item.status === "verified" && item.value)
+    .filter((item) => accepted.has(item.kind) && item.status === "verified" && item.review?.decision !== "rejected" && item.value)
     .map((item) => String(item.value).trim().toLowerCase());
 }
 

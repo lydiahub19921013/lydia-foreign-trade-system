@@ -85,6 +85,7 @@
         <div id="summary" class="summary-grid"></div>
 
         <div id="duplicateNotice" class="duplicate-notice hidden"></div>
+        <p id="evidenceAuditStatus" class="status evidence-audit-status" role="status" aria-live="polite">可以展开客户证据，驳回、恢复或修订已入档内容。</p>
         <div id="leadList" class="lead-list"></div>
       </section>
 
@@ -255,6 +256,33 @@
         </div>
       </section>
     </main>
+
+    <dialog id="evidenceReviewDialog" class="evidence-dialog" aria-labelledby="evidenceDialogTitle">
+      <form id="evidenceReviewForm" method="dialog">
+        <p class="section-label">证据复核</p>
+        <h2 id="evidenceDialogTitle">复核证据</h2>
+        <p id="evidenceDialogDescription" class="dialog-description"></p>
+        <div id="evidenceRevisionFields" class="dialog-fields" hidden>
+          <label>
+            <span>修订后的证据内容</span>
+            <textarea id="evidenceRevisedValue" maxlength="2000" rows="4"></textarea>
+          </label>
+          <label>
+            <span>修订后的来源</span>
+            <input id="evidenceRevisedSource" maxlength="2000" />
+          </label>
+        </div>
+        <label class="dialog-note">
+          <span>复核原因（至少 3 个字）</span>
+          <textarea id="evidenceReviewNote" minlength="3" maxlength="1000" rows="3" required></textarea>
+        </label>
+        <p id="evidenceDialogStatus" class="status" role="status" aria-live="polite"></p>
+        <div class="dialog-actions">
+          <button id="cancelEvidenceReview" class="button ghost" type="button">取消</button>
+          <button id="evidenceReviewSubmit" class="button primary" type="submit">保存</button>
+        </div>
+      </form>
+    </dialog>
 
     <footer>LYDIA · 外贸线索有证据、有优先级、有下一步</footer>
     <script type="module" src="/apps/lead-workbench/app.mjs"></script>

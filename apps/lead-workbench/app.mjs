@@ -1,4 +1,5 @@
 import {
+  SCHEMA_VERSION,
   assessEmailCandidates,
   checkCompanyDomainMatch,
   checkEmailCandidateLeadMatch,
@@ -17,8 +18,10 @@ import {
   qualifyLead,
   rankPublicProspects,
   rankIntroductionPaths,
+  reviewLeadEvidence,
   relationshipsFromCsv,
-  relationshipsFromJson
+  relationshipsFromJson,
+  reviseLeadEvidence
 } from "/packages/lead-core/src/index.mjs";
 
 const $ = (selector) => document.querySelector(selector);
@@ -31,6 +34,7 @@ let currentWebsiteResearch = null;
 let selectedWebsiteEvidenceIds = new Set();
 let currentEmailResearch = null;
 let currentRelationshipResult = null;
+let pendingEvidenceAction = null;
 
 function updateStatus(selector, message, type = "neutral") {
   const status = $(selector);
@@ -62,7 +66,7 @@ async function parseFile(file) {
 function buildResult(leads, sourceFile) {
   return {
     format: "lydia-qualified-leads",
-    schemaVersion: 1,
+    schemaVersion: SCHEMA_VERSION,
     product: "Lydia 外贸系统",
     generatedAt: new Date().toISOString(),
     sourceFile,
@@ -158,11 +162,39 @@ function renderSummary() {
   }
 }
 
+function evidenceReviewLabel(evidence) {
+  if (evidence.review?.decision === "rejected") return "人工已拒绝";
+  if (evidence.review?.history?.at(-1)?.action === "revised") return "人工已修订";
+  if (evidence.review?.decision === "accepted") return "人工已选";
+  return null;
+}
+
+function openEvidenceDialog(lead, evidence, action) {
+  pendingEvidenceAction = { leadId: lead.id, evidenceId: evidence.id, action };
+  const labels = {
+    rejected: ["驳回这条证据", "说明为什么这条证据不能继续用于客户判断。由它自动填入且未被人工改过的字段会一并撤回。"],
+    accepted: ["恢复使用这条证据", "说明为什么重新使用。只有当前仍为空的原字段才会恢复，不会覆盖人工修改。"],
+    revised: ["修订这条证据", "修改证据内容或来源并填写原因。系统保留修改前后的差异。"]
+  };
+  const [title, description] = labels[action];
+  $("#evidenceDialogTitle").textContent = title;
+  $("#evidenceDialogDescription").textContent = description;
+  $("#evidenceRevisionFields").hidden = action !== "revised";
+  $("#evidenceRevisedValue").value = String(evidence.value ?? "");
+  $("#evidenceRevisedSource").value = evidence.sourceRef || "";
+  $("#evidenceReviewNote").value = "";
+  $("#evidenceReviewSubmit").textContent = action === "rejected" ? "确认驳回" : action === "accepted" ? "确认恢复" : "保存修订";
+  $("#evidenceDialogStatus").textContent = "";
+  $("#evidenceReviewDialog").showModal();
+  $("#evidenceReviewNote").focus();
+}
+
 function evidenceList(lead) {
   const details = document.createElement("details");
   details.className = "evidence-toggle";
   const summary = document.createElement("summary");
-  summary.textContent = `查看证据（${lead.evidence.length} 条）`;
+  const rejectedCount = lead.evidence.filter((item) => item.review?.decision === "rejected").length;
+  summary.textContent = `查看证据（${lead.evidence.length} 条${rejectedCount ? `，${rejectedCount} 条已拒绝` : ""}）`;
   const list = document.createElement("ul");
   list.className = "evidence-list";
 
@@ -173,13 +205,106 @@ function evidenceList(lead) {
   } else {
     for (const evidence of lead.evidence) {
       const item = document.createElement("li");
-      const review = evidence.review?.decision === "accepted" ? " · 人工已选" : evidence.review?.decision === "rejected" ? " · 人工已拒绝" : "";
-      item.textContent = `${evidence.status}${review} · ${evidence.kind} · ${String(evidence.value ?? "")} · 来源：${evidence.sourceRef || "缺失"}`;
+      item.className = evidence.review?.decision === "rejected" ? "evidence-item rejected" : "evidence-item";
+      const body = document.createElement("div");
+      body.className = "evidence-item-body";
+      const meta = document.createElement("strong");
+      const reviewLabel = evidenceReviewLabel(evidence);
+      meta.textContent = `${evidence.status}${reviewLabel ? ` · ${reviewLabel}` : ""} · ${evidence.kind}`;
+      const value = document.createElement("span");
+      const fullValue = String(evidence.value ?? "");
+      value.textContent = fullValue.length > 400 ? `${fullValue.slice(0, 399)}…` : fullValue;
+      const source = document.createElement("span");
+      source.className = "evidence-source";
+      if (/^https?:\/\//iu.test(evidence.sourceRef || "")) {
+        const link = document.createElement("a");
+        link.href = evidence.sourceRef;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = "查看来源 ↗";
+        source.append(link);
+      } else if (evidence.sourceRef) {
+        source.textContent = `来源：${evidence.sourceRef}`;
+      } else {
+        source.textContent = "来源缺失";
+      }
+      body.append(meta, value, source);
+      if (evidence.review?.history?.length) {
+        const audit = document.createElement("small");
+        audit.textContent = `复核历史 ${evidence.review.history.length} 次 · 最近原因：${evidence.review.note || "未填写"}`;
+        body.append(audit);
+      }
+      item.append(body);
+
+      if (lead.id) {
+        const actions = document.createElement("div");
+        actions.className = "evidence-item-actions";
+        const decision = evidence.review?.decision === "rejected" ? "accepted" : "rejected";
+        const decisionButton = document.createElement("button");
+        decisionButton.className = "button ghost compact";
+        decisionButton.type = "button";
+        decisionButton.textContent = decision === "rejected" ? "驳回" : "恢复";
+        decisionButton.addEventListener("click", () => openEvidenceDialog(lead, evidence, decision));
+        actions.append(decisionButton);
+        if (decision === "rejected" && evidence.value !== null && evidence.sourceRef) {
+          const reviseButton = document.createElement("button");
+          reviseButton.className = "button ghost compact";
+          reviseButton.type = "button";
+          reviseButton.textContent = "修订";
+          reviseButton.addEventListener("click", () => openEvidenceDialog(lead, evidence, "revised"));
+          actions.append(reviseButton);
+        }
+        item.append(actions);
+      }
       list.append(item);
     }
   }
   details.append(summary, list);
   return details;
+}
+
+function evidenceActionMessage(action, result) {
+  if (action === "rejected") {
+    const cleared = result.clearedFields.length;
+    const preserved = result.preservedFields.length;
+    return `证据已驳回，撤回 ${cleared} 个由它填入且未被改动的字段${preserved ? `；${preserved} 个已有人工修改的字段保持不变` : ""}。`;
+  }
+  if (action === "accepted") {
+    return `证据已恢复，恢复 ${result.restoredFields.length} 个仍可安全还原的字段${result.preservedFields.length ? `；${result.preservedFields.length} 个现有字段未被覆盖` : ""}。`;
+  }
+  return `证据修订已保存，更新 ${result.updatedFields.length} 个仍由该证据管理的字段${result.preservedFields.length ? `；${result.preservedFields.length} 个人工字段未被覆盖` : ""}。`;
+}
+
+function applyEvidenceAction(event) {
+  event.preventDefault();
+  if (!pendingEvidenceAction || !currentResult) return;
+  const item = currentResult.results.find((result) => result.lead.id === pendingEvidenceAction.leadId);
+  if (!item) return;
+  const note = $("#evidenceReviewNote").value;
+  try {
+    const result = pendingEvidenceAction.action === "revised"
+      ? reviseLeadEvidence(item.lead, pendingEvidenceAction.evidenceId, {
+        value: $("#evidenceRevisedValue").value,
+        sourceRef: $("#evidenceRevisedSource").value
+      }, { note })
+      : reviewLeadEvidence(item.lead, pendingEvidenceAction.evidenceId, {
+        decision: pendingEvidenceAction.action,
+        note
+      });
+    currentResult.results = currentResult.results.map((candidate) => candidate.lead.id === item.lead.id
+      ? { lead: result.lead, qualification: qualifyLead(result.lead) }
+      : candidate);
+    currentResult.generatedAt = new Date().toISOString();
+    currentResult.duplicateCandidates = findDuplicateCandidates(currentResult.results.map((candidate) => candidate.lead));
+    const message = evidenceActionMessage(pendingEvidenceAction.action, result);
+    $("#evidenceReviewDialog").close();
+    pendingEvidenceAction = null;
+    renderSummary();
+    renderLeads();
+    updateStatus("#evidenceAuditStatus", message, "success");
+  } catch (error) {
+    updateStatus("#evidenceDialogStatus", error.message || "证据复核失败。", "error");
+  }
 }
 
 function leadCard(item) {
@@ -198,10 +323,13 @@ function leadCard(item) {
   const meta = document.createElement("div");
   meta.className = "lead-meta";
   meta.textContent = [lead.source, lead.organization.country, lead.inquiry.product, lead.contact.role].filter(Boolean).join(" · ") || "缺少基础信息";
+  const contacts = document.createElement("div");
+  contacts.className = "lead-contacts";
+  contacts.textContent = [lead.contact.email, lead.contact.whatsapp, lead.contact.phone].filter(Boolean).join(" · ") || "暂无联系信息";
   const action = document.createElement("p");
   action.className = "lead-action";
   action.textContent = qualification.nextAction;
-  main.append(title, meta, action);
+  main.append(title, meta, contacts, action);
 
   if (qualification.missingEvidence.length) {
     const missing = document.createElement("div");
@@ -517,14 +645,23 @@ function companyCard(company) {
   save.className = "button ghost compact";
   save.type = "button";
   save.textContent = "确认匹配并加入询盘";
-  save.addEventListener("click", () => attachResearchEvidence("#companyTargetLead", {
-    organization: {
-      name: company.legalName,
-      address: company.legalAddress,
-      registrationId: company.registeredAs
-    },
-    evidence: company.evidence
-  }, "#companyStatus", "GLEIF 企业证据"));
+  save.addEventListener("click", () => {
+    const byKind = Object.fromEntries(company.evidence.map((item) => [item.kind, item.id]));
+    attachResearchEvidence("#companyTargetLead", {
+      organization: {
+        name: company.legalName,
+        address: company.legalAddress,
+        registrationId: company.registeredAs
+      },
+      evidence: company.evidence,
+      fieldEvidence: {
+        "organization.name": byKind["legal-entity-record"],
+        "organization.address": byKind["business-address"],
+        "organization.registrationId": byKind["business-registration"]
+      },
+      appliedAt: currentCompanyResearch?.observedAt
+    }, "#companyStatus", "GLEIF 企业证据");
+  });
 
   const actions = document.createElement("div");
   actions.className = "card-actions";
@@ -674,16 +811,10 @@ function reviewableEvidenceList(result) {
 function selectedWebsiteResearch(result) {
   const selected = enrichmentFromEvidenceSelection(result.evidence, selectedWebsiteEvidenceIds, { reviewedAt: currentWebsiteResearch?.reviewedAt });
   return {
-    ...result,
-    title: selected.organization.name || result.title,
-    contacts: {
-      emails: [selected.contact.email].filter(Boolean),
-      phones: [selected.contact.phone].filter(Boolean),
-      whatsapp: [selected.contact.whatsapp].filter(Boolean)
-    },
-    addresses: [selected.organization.address].filter(Boolean),
-    factorySignals: [selected.organization.factoryInfo].filter(Boolean),
-    evidence: selected.evidence,
+    ...selected,
+    reviewedPageUrl: result.finalUrl,
+    originalPageReviewed: true,
+    reviewedAt: currentWebsiteResearch?.reviewedAt,
     reviewedEvidenceIds: [...selectedWebsiteEvidenceIds]
   };
 }
@@ -877,7 +1008,12 @@ function emailCandidateCard(candidate) {
     attachResearchEvidence("#emailTargetLead", {
       organization: { domain: candidate.domain },
       contact: { email: candidate.email },
-      evidence: [currentEmailResearch.mailDomain.evidence, emailEvidence]
+      evidence: [currentEmailResearch.mailDomain.evidence, emailEvidence],
+      fieldEvidence: {
+        "organization.domain": emailEvidence.id,
+        "contact.email": emailEvidence.id
+      },
+      appliedAt: currentEmailResearch.observedAt
     }, "#emailStatus", "候选邮箱" );
   });
   actions.className = "card-actions";
@@ -1086,4 +1222,10 @@ $("#exportRelationshipPaths").addEventListener("click", () => {
   if (!currentRelationshipResult) return;
   downloadJson(currentRelationshipResult, `Lydia-信任路径-${new Date().toISOString().slice(0, 10)}.json`);
   updateStatus("#relationshipStatus", "候选路径已导出。下一步仍应先征得关系人明确同意。", "success");
+});
+
+$("#evidenceReviewForm").addEventListener("submit", applyEvidenceAction);
+$("#cancelEvidenceReview").addEventListener("click", () => {
+  pendingEvidenceAction = null;
+  $("#evidenceReviewDialog").close();
 });

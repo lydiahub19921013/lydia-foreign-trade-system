@@ -18,6 +18,9 @@ test("evidence selection writes only explicitly selected values", () => {
   assert.equal(result.contact.email, "sales@northstar.example");
   assert.equal(result.contact.phone, null);
   assert.deepEqual(result.evidence.map((item) => item.id), ["site", "email", "factory"]);
+  assert.equal(result.fieldEvidence["organization.website"], "site");
+  assert.equal(result.fieldEvidence["contact.email"], "email");
+  assert.equal(result.fieldEvidence["organization.factoryInfo"], "factory");
   assert.ok(result.evidence.every((item) => item.status === "candidate"));
   assert.ok(result.evidence.every((item) => item.review.decision === "accepted"));
   assert.ok(result.evidence.every((item) => item.review.reviewedAt === "2026-09-08T00:00:00.000Z"));

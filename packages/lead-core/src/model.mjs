@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const EVIDENCE_STATUSES = new Set([
   "candidate",
@@ -7,8 +7,31 @@ const EVIDENCE_STATUSES = new Set([
   "rejected"
 ]);
 
+const REVIEW_ACTIONS = new Set(["accepted", "rejected", "revised"]);
+const REVIEW_DECISIONS = new Set(["accepted", "rejected"]);
+const LEAD_FIELD_PATHS = new Set([
+  "organization.name",
+  "organization.domain",
+  "organization.website",
+  "organization.country",
+  "organization.address",
+  "organization.industry",
+  "organization.employeeRange",
+  "organization.registrationId",
+  "organization.factoryInfo",
+  "contact.name",
+  "contact.role",
+  "contact.email",
+  "contact.whatsapp",
+  "contact.phone"
+]);
+
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function boundedText(value, maxLength = 1000) {
+  return String(value ?? "").trim().slice(0, maxLength);
 }
 
 function bool(value) {
@@ -54,12 +77,68 @@ function stableLeadId(input) {
   return `lead_${stableDigest(seed || "empty-lead").slice(0, 12)}`;
 }
 
+function changePair(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  return {
+    from: input.from === null || input.from === undefined ? null : boundedText(input.from, 2000),
+    to: input.to === null || input.to === undefined ? null : boundedText(input.to, 2000)
+  };
+}
+
+function reviewEvent(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  if (!REVIEW_ACTIONS.has(input.action)) return null;
+  const changes = {};
+  for (const field of ["value", "sourceRef"]) {
+    const pair = changePair(input.changes?.[field]);
+    if (pair && pair.from !== pair.to) changes[field] = pair;
+  }
+  return {
+    action: input.action,
+    reviewedAt: isoDate(input.reviewedAt),
+    note: boundedText(input.note, 1000) || null,
+    changes: Object.keys(changes).length ? changes : null
+  };
+}
+
+function normalizeReview(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  const decision = REVIEW_DECISIONS.has(input.decision) ? input.decision : null;
+  const reviewedAt = isoDate(input.reviewedAt);
+  const note = boundedText(input.note, 1000) || null;
+  const history = (Array.isArray(input.history) ? input.history : [])
+    .map(reviewEvent)
+    .filter(Boolean)
+    .slice(-50);
+  if (decision && !history.length) {
+    history.push({ action: decision, reviewedAt, note, changes: null });
+  }
+  return decision ? { decision, reviewedAt, note, history } : null;
+}
+
+function normalizeFieldOrigin(input = {}) {
+  if (!input || typeof input !== "object") return null;
+  const path = boundedText(input.path, 80);
+  const evidenceId = boundedText(input.evidenceId, 120);
+  if (!LEAD_FIELD_PATHS.has(path) || !evidenceId) return null;
+  return {
+    path,
+    evidenceId,
+    appliedValue: input.appliedValue === null || input.appliedValue === undefined
+      ? null
+      : boundedText(input.appliedValue, 2000),
+    appliedAt: isoDate(input.appliedAt),
+    updatedAt: isoDate(input.updatedAt),
+    active: input.active !== false,
+    endedAt: isoDate(input.endedAt),
+    endReason: boundedText(input.endReason, 80) || null
+  };
+}
+
 export function createEvidence(input = {}) {
   const status = EVIDENCE_STATUSES.has(input.status)
     ? input.status
     : "candidate";
-  const reviewInput = input.review || {};
-  const reviewDecision = ["accepted", "rejected"].includes(reviewInput.decision) ? reviewInput.decision : null;
 
   return {
     id: input.id || `ev_${stableDigest(JSON.stringify([
@@ -75,11 +154,7 @@ export function createEvidence(input = {}) {
     confidence: boundedNumber(input.confidence, status === "verified" ? 1 : 0.5),
     status,
     note: clean(input.note) || null,
-    review: reviewDecision ? {
-      decision: reviewDecision,
-      reviewedAt: isoDate(reviewInput.reviewedAt),
-      note: clean(reviewInput.note) || null
-    } : null
+    review: normalizeReview(input.review)
   };
 }
 
@@ -133,6 +208,10 @@ export function normalizeLead(input = {}) {
     evidence: Array.isArray(input.evidence)
       ? input.evidence.map(createEvidence)
       : [],
+    fieldOrigins: (Array.isArray(input.fieldOrigins) ? input.fieldOrigins : [])
+      .map(normalizeFieldOrigin)
+      .filter(Boolean)
+      .slice(-200),
     compliance: {
       doNotContact: bool(compliance.doNotContact),
       restrictedMarket: bool(compliance.restrictedMarket),

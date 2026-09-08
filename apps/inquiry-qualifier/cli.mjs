@@ -2,7 +2,7 @@
 
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, extname, resolve } from "node:path";
-import { findDuplicateCandidates, leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
+import { SCHEMA_VERSION, findDuplicateCandidates, leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
 
 function usage() {
   return "用法：npm run qualify -- <inquiries.csv|json> [--channel auto|alibaba|made-in-china] [--output result.json]";
@@ -50,7 +50,7 @@ if (args && !args.input) {
     const leads = await loadLeads(inputPath, args.channel);
     const result = {
       format: "lydia-qualified-leads",
-      schemaVersion: 1,
+      schemaVersion: SCHEMA_VERSION,
       product: "Lydia 外贸系统",
       generatedAt: new Date().toISOString(),
       sourceFile: basename(inputPath),

@@ -1,5 +1,7 @@
 export const STORAGE_KEY = "foreignTradeDevelopmentState";
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
+
+const LYDIA_MANAGED_FIELDS = ["name", "company", "country", "email", "whatsapp"];
 
 function text(value, maxLength) {
   return String(value ?? "").trim().slice(0, maxLength);
@@ -12,6 +14,16 @@ function list(value) {
 function score(value) {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(0, Math.min(100, Math.round(number))) : 0;
+}
+
+function normalizeLeadManagedFields(input) {
+  const result = {};
+  if (!input || typeof input !== "object") return result;
+  for (const field of LYDIA_MANAGED_FIELDS) {
+    const value = text(input[field], field === "email" ? 254 : 120);
+    if (value) result[field] = field === "email" ? value.toLowerCase() : value;
+  }
+  return result;
 }
 
 function normalizeLeadProfile(profile) {
@@ -67,6 +79,7 @@ function normalizeCustomer(customer) {
     whatsapp: text(customer?.whatsapp, 80),
     notes: text(customer?.notes, 1000),
     leadProfile: normalizeLeadProfile(customer?.leadProfile),
+    leadManagedFields: normalizeLeadManagedFields(customer?.leadManagedFields),
     createdAt: text(customer?.createdAt, 40) || now,
     updatedAt: text(customer?.updatedAt, 40) || now
   };
@@ -110,13 +123,20 @@ export function migrateState(input) {
   };
 }
 
-export function upsertCustomer(state, customer, now = new Date().toISOString()) {
+export function upsertCustomer(state, customer, now = new Date().toISOString(), options = {}) {
   const next = migrateState(state);
   const normalized = normalizeCustomer({ ...customer, updatedAt: now });
   const existingIndex = next.customers.findIndex((item) => item.id === normalized.id);
 
   if (existingIndex >= 0) {
-    normalized.createdAt = next.customers[existingIndex].createdAt;
+    const existing = next.customers[existingIndex];
+    normalized.createdAt = existing.createdAt;
+    if (options.mode !== "lydia-import") {
+      normalized.leadManagedFields = { ...existing.leadManagedFields };
+      for (const field of LYDIA_MANAGED_FIELDS) {
+        if (normalized[field] !== existing[field]) delete normalized.leadManagedFields[field];
+      }
+    }
     next.customers[existingIndex] = normalized;
   } else {
     normalized.createdAt = now;
@@ -170,6 +190,33 @@ function leadNotes(lead, qualification) {
   ].filter(Boolean).join("\n");
 }
 
+function importedCustomerFields(existing, lead) {
+  const incoming = {
+    name: text(lead.contact?.name, 80),
+    company: text(lead.organization?.name, 120),
+    country: text(lead.organization?.country, 80),
+    email: text(lead.contact?.email, 254).toLowerCase(),
+    whatsapp: text(lead.contact?.whatsapp, 80)
+  };
+  const values = {};
+  const managed = {};
+
+  for (const field of LYDIA_MANAGED_FIELDS) {
+    const current = existing?.[field] || "";
+    const previousManaged = existing?.leadManagedFields?.[field] || "";
+    if (!existing || !current) {
+      values[field] = incoming[field];
+      if (incoming[field]) managed[field] = incoming[field];
+    } else if (previousManaged && current === previousManaged) {
+      values[field] = incoming[field];
+      if (incoming[field]) managed[field] = incoming[field];
+    } else {
+      values[field] = current;
+    }
+  }
+  return { values, managed };
+}
+
 export function importQualifiedLeads(payload, currentState, now = new Date().toISOString()) {
   if (payload?.format !== "lydia-qualified-leads" || !Array.isArray(payload.results)) {
     throw new Error("这不是有效的 Lydia 客户分级文件");
@@ -187,14 +234,15 @@ export function importQualifiedLeads(payload, currentState, now = new Date().toI
     const leadId = text(lead.id, 100);
     if (!leadId) continue;
     const existing = next.customers.find((customer) => customer.id === leadId);
+    const importedFields = importedCustomerFields(existing, lead);
+    const activeEvidenceCount = Array.isArray(lead.evidence)
+      ? lead.evidence.filter((evidence) => evidence?.status !== "rejected" && evidence?.review?.decision !== "rejected").length
+      : 0;
     const result = upsertCustomer(next, {
       id: leadId,
-      name: text(lead.contact?.name, 80) || existing?.name,
-      company: text(lead.organization?.name, 120) || existing?.company,
-      country: text(lead.organization?.country, 80) || existing?.country,
-      email: text(lead.contact?.email, 254) || existing?.email,
-      whatsapp: text(lead.contact?.whatsapp, 80) || existing?.whatsapp,
+      ...importedFields.values,
       notes: existing?.notes || leadNotes(lead, qualification),
+      leadManagedFields: importedFields.managed,
       leadProfile: {
         leadId,
         grade: qualification.grade,
@@ -208,10 +256,10 @@ export function importQualifiedLeads(payload, currentState, now = new Date().toI
         inquiryMessage: lead.inquiry?.message,
         nextAction: qualification.nextAction,
         missingEvidence: qualification.missingEvidence,
-        evidenceCount: Array.isArray(lead.evidence) ? lead.evidence.length : 0,
+        evidenceCount: activeEvidenceCount,
         importedAt: now
       }
-    }, now);
+    }, now, { mode: "lydia-import" });
     next = result.state;
     existing ? updatedCount += 1 : importedCount += 1;
   }

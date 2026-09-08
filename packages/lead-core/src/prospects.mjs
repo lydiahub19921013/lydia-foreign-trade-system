@@ -1,5 +1,7 @@
 import { parseCsv } from "./csv.mjs";
 import { createEvidence, normalizeLead } from "./model.mjs";
+import { mergeEvidenceIntoLead } from "./enrichment.mjs";
+import { checkCompanyDomainMatch } from "./email-candidates.mjs";
 
 const SCORE_WEIGHTS = Object.freeze({
   needSignal: 25,
@@ -113,6 +115,7 @@ export function normalizePublicProspect(input = {}, defaults = {}) {
   const normalized = {
     id: clean(input.id) || `prospect_${digest(`${sourceUrl}|${input.companyName || input.title}|${signalExcerpt}`)}`,
     companyName: boundedText(input.companyName || input.company_name || input.company || input.organization || input.title, 300) || null,
+    companyDomain: clean(input.companyDomain || input.company_domain) || null,
     title: boundedText(input.title, 300) || null,
     sourceUrl,
     publishedAt: isoDate(input.publishedAt || input.published || input.published_date),
@@ -252,34 +255,43 @@ export function rankPublicProspects(prospects = []) {
 
 export function prospectToLead(input, websiteResearch = {}) {
   const prospect = input?.qualification ? input : normalizePublicProspect(input);
-  const websiteUrl = cleanUrl(websiteResearch.finalUrl || websiteResearch.url || prospect.sourceUrl);
-  if (!websiteUrl || !websiteResearch.originalPageReviewed) {
+  const reviewedPageUrl = cleanUrl(websiteResearch.reviewedPageUrl || websiteResearch.finalUrl || websiteResearch.url);
+  if (!reviewedPageUrl || !websiteResearch.originalPageReviewed) {
     throw new Error("加入开发队列前必须人工核查一张原始公开页面");
   }
-  const hostname = new URL(websiteUrl).hostname.replace(/^www\./u, "");
+  const domainMatch = checkCompanyDomainMatch({ organization: { domain: prospect.companyDomain } }, reviewedPageUrl);
+  if (!domainMatch.allowed) throw new Error("核查页面与公开候选的企业域名不一致");
+
   const websiteEvidence = Array.isArray(websiteResearch.evidence) ? websiteResearch.evidence : [];
-  return normalizeLead({
+  const base = normalizeLead({
     source: "Public research",
-    sourceReference: prospect.sourceUrl || websiteUrl,
+    sourceReference: prospect.sourceUrl || reviewedPageUrl,
     receivedAt: prospect.observedAt,
     organization: {
-      name: prospect.companyName || websiteResearch.title,
-      domain: hostname,
-      website: websiteUrl,
-      country: prospect.market,
-      address: websiteResearch.addresses?.[0],
-      factoryInfo: websiteResearch.factorySignals?.[0]
-    },
-    contact: {
-      email: websiteResearch.contacts?.emails?.[0],
-      phone: websiteResearch.contacts?.phones?.[0],
-      whatsapp: websiteResearch.contacts?.whatsapp?.[0]
+      name: prospect.companyName,
+      domain: prospect.companyDomain,
+      country: prospect.market
     },
     inquiry: {
       message: prospect.signalExcerpt,
       product: prospect.product
     },
-    evidence: [...prospect.evidence, ...websiteEvidence],
+    evidence: prospect.evidence,
     notes: "由公开搜索候选转入人工开发队列；不是客户主动询盘，联系前仍需确认身份、需求与合规基础。"
+  });
+  const organization = { ...(websiteResearch.organization || {}) };
+  const fieldEvidence = { ...(websiteResearch.fieldEvidence || {}) };
+  if (organization.website && !organization.domain) {
+    organization.domain = new URL(cleanUrl(organization.website)).hostname.replace(/^www\./u, "");
+    if (fieldEvidence["organization.website"]) {
+      fieldEvidence["organization.domain"] = fieldEvidence["organization.website"];
+    }
+  }
+  return mergeEvidenceIntoLead(base, {
+    organization,
+    contact: websiteResearch.contact,
+    evidence: websiteEvidence,
+    fieldEvidence,
+    appliedAt: websiteResearch.reviewedAt
   });
 }

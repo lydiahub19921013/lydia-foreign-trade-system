@@ -92,6 +92,7 @@ input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-co
 .grade-hold { background: var(--coral); font-family: inherit; font-size: 10px; font-weight: 900; }
 .lead-main h3 { margin: 1px 0 6px; font-size: 20px; }
 .lead-meta { color: var(--muted); font-size: 13px; }
+.lead-contacts { margin-top: 5px; color: var(--forest); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
 .lead-action { margin: 14px 0 0; line-height: 1.55; }
 .missing { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 .missing span { border-radius: 999px; background: #f2efe8; padding: 5px 9px; color: #685f57; font-size: 12px; }
@@ -100,7 +101,26 @@ input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-co
 .score span { display: block; color: var(--muted); font-size: 11px; }
 .evidence-toggle { grid-column: 2 / -1; border-top: 1px solid #ebe6dc; padding-top: 14px; }
 .evidence-toggle summary { color: var(--forest); cursor: pointer; font-weight: 700; font-size: 13px; }
-.evidence-list { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.evidence-list { display: grid; gap: 9px; margin: 12px 0 0; padding: 0; color: var(--muted); font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; list-style: none; }
+.evidence-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; border-radius: 11px; background: #f7f5ef; padding: 11px 12px; }
+.evidence-item.rejected { background: #f8ebe6; opacity: .8; }
+.evidence-item-body { min-width: 0; display: grid; gap: 4px; }
+.evidence-item-body strong { color: var(--forest); font-size: 11px; text-transform: uppercase; }
+.evidence-item.rejected .evidence-item-body strong { color: #8d3529; }
+.evidence-item-body small { color: #81776d; }
+.evidence-source a { color: var(--forest); font-size: 11px; font-weight: 700; }
+.evidence-item-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
+.evidence-item-actions .button { padding: 6px 10px; }
+.evidence-audit-status { margin: 14px 0; }
+.evidence-dialog { width: min(620px, calc(100vw - 28px)); border: 0; border-radius: 20px; box-shadow: 0 26px 80px rgb(24 37 29 / 30%); padding: 0; }
+.evidence-dialog::backdrop { background: rgb(20 29 24 / 48%); }
+.evidence-dialog form { display: grid; gap: 15px; padding: 24px; }
+.evidence-dialog h2 { margin: 0; }
+.dialog-description { margin: 0; color: var(--muted); line-height: 1.6; }
+.dialog-fields, .dialog-note { display: grid; gap: 12px; }
+.dialog-fields label, .dialog-note { display: grid; gap: 7px; color: var(--ink); font-size: 13px; font-weight: 760; }
+.evidence-dialog textarea { resize: vertical; min-height: 76px; }
+.dialog-actions { display: flex; justify-content: end; gap: 9px; }
 .empty { padding: 42px; text-align: center; color: var(--muted); }
 .bordered-empty { margin: 0; border: 1px dashed var(--line); border-radius: 14px; }
 

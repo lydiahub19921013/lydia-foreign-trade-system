@@ -1,7 +1,9 @@
 import {
   assessEmailCandidates,
+  checkCompanyDomainMatch,
   checkEmailCandidateLeadMatch,
   createEvidence,
+  enrichmentFromEvidenceSelection,
   findDuplicateCandidates,
   generateEmailCandidates,
   leadsFromCsv,
@@ -26,6 +28,7 @@ let currentProspectResult = null;
 let currentProspectForWebsite = null;
 let currentCompanyResearch = null;
 let currentWebsiteResearch = null;
+let selectedWebsiteEvidenceIds = new Set();
 let currentEmailResearch = null;
 let currentRelationshipResult = null;
 
@@ -170,7 +173,8 @@ function evidenceList(lead) {
   } else {
     for (const evidence of lead.evidence) {
       const item = document.createElement("li");
-      item.textContent = `${evidence.status} · ${evidence.kind} · ${String(evidence.value ?? "")} · 来源：${evidence.sourceRef || "缺失"}`;
+      const review = evidence.review?.decision === "accepted" ? " · 人工已选" : evidence.review?.decision === "rejected" ? " · 人工已拒绝" : "";
+      item.textContent = `${evidence.status}${review} · ${evidence.kind} · ${String(evidence.value ?? "")} · 来源：${evidence.sourceRef || "缺失"}`;
       list.append(item);
     }
   }
@@ -612,6 +616,78 @@ function dossierPages(result) {
   return details;
 }
 
+function updateWebsiteSelectionActions() {
+  if (currentWebsiteResearch) {
+    currentWebsiteResearch.reviewedEvidenceIds = [...selectedWebsiteEvidenceIds];
+    currentWebsiteResearch.reviewedAt = new Date().toISOString();
+  }
+  for (const button of document.querySelectorAll(".website-save-action")) {
+    button.disabled = selectedWebsiteEvidenceIds.size === 0 || (button.dataset.requiresLead === "true" && !currentResult?.results.length);
+  }
+  const count = $("#websiteSelectionCount");
+  if (count) count.textContent = `已选择 ${selectedWebsiteEvidenceIds.size} 条；未选择的内容不会进入客户档案。`;
+}
+
+function reviewableEvidenceList(result) {
+  const details = document.createElement("details");
+  details.className = "evidence-review";
+  details.open = true;
+  const summary = document.createElement("summary");
+  summary.textContent = `逐条选择要保留的证据（${result.evidence.length} 条）`;
+  const count = document.createElement("p");
+  count.id = "websiteSelectionCount";
+  count.className = "selection-count";
+  count.textContent = "已选择 0 条；未选择的内容不会进入客户档案。";
+  const list = document.createElement("div");
+  list.className = "evidence-choice-list";
+  for (const evidence of result.evidence) {
+    const label = document.createElement("label");
+    label.className = "evidence-choice";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = selectedWebsiteEvidenceIds.has(evidence.id);
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) selectedWebsiteEvidenceIds.add(evidence.id);
+      else selectedWebsiteEvidenceIds.delete(evidence.id);
+      updateWebsiteSelectionActions();
+    });
+    const body = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = evidence.kind;
+    const value = document.createElement("span");
+    const evidenceValue = String(evidence.value ?? "");
+    value.textContent = evidenceValue.length > 260 ? `${evidenceValue.slice(0, 259)}…` : evidenceValue;
+    const source = document.createElement("a");
+    source.href = evidence.sourceRef;
+    source.target = "_blank";
+    source.rel = "noreferrer";
+    source.textContent = "查看来源 ↗";
+    source.addEventListener("click", (event) => event.stopPropagation());
+    body.append(title, value, source);
+    label.append(checkbox, body);
+    list.append(label);
+  }
+  details.append(summary, count, list);
+  return details;
+}
+
+function selectedWebsiteResearch(result) {
+  const selected = enrichmentFromEvidenceSelection(result.evidence, selectedWebsiteEvidenceIds, { reviewedAt: currentWebsiteResearch?.reviewedAt });
+  return {
+    ...result,
+    title: selected.organization.name || result.title,
+    contacts: {
+      emails: [selected.contact.email].filter(Boolean),
+      phones: [selected.contact.phone].filter(Boolean),
+      whatsapp: [selected.contact.whatsapp].filter(Boolean)
+    },
+    addresses: [selected.organization.address].filter(Boolean),
+    factorySignals: [selected.organization.factoryInfo].filter(Boolean),
+    evidence: selected.evidence,
+    reviewedEvidenceIds: [...selectedWebsiteEvidenceIds]
+  };
+}
+
 function websiteCard(result) {
   const card = document.createElement("article");
   card.className = "company-card";
@@ -649,40 +725,49 @@ function websiteCard(result) {
   source.textContent = "打开来源页面 ↗";
 
   const save = document.createElement("button");
-  save.className = "button ghost compact";
+  save.className = "button ghost compact website-save-action";
   save.type = "button";
-  save.textContent = "人工确认并加入询盘";
-  save.disabled = !currentResult?.results.length;
-  save.addEventListener("click", () => attachResearchEvidence("#websiteTargetLead", {
-    organization: {
-      name: result.title,
-      website: result.finalUrl,
-      address: result.addresses?.[0],
-      factoryInfo: result.factorySignals?.[0]
-    },
-    contact: {
-      email: result.contacts?.emails?.[0],
-      phone: result.contacts?.phones?.[0],
-      whatsapp: result.contacts?.whatsapp?.[0]
-    },
-    evidence: result.evidence
-  }, "#websiteStatus", "官网候选证据"));
+  save.dataset.requiresLead = "true";
+  save.textContent = "把所选证据加入询盘";
+  save.disabled = true;
+  save.addEventListener("click", () => {
+    try {
+      const targetId = $("#websiteTargetLead").value;
+      const target = currentResult?.results.find((item) => item.lead.id === targetId)?.lead;
+      const match = checkCompanyDomainMatch(target, result.finalUrl);
+      if (!match.allowed) {
+        updateStatus("#websiteStatus", `不能加入：该询盘企业域名 ${match.existingDomain || "格式异常"} 与官网域名 ${match.candidateDomain} 不一致。`, "error");
+        return;
+      }
+      attachResearchEvidence("#websiteTargetLead", enrichmentFromEvidenceSelection(result.evidence, selectedWebsiteEvidenceIds, { reviewedAt: currentWebsiteResearch?.reviewedAt }), "#websiteStatus", "所选官网证据");
+    } catch (error) {
+      updateStatus("#websiteStatus", error.message || "请选择要保留的证据。", "error");
+    }
+  });
 
   const actions = document.createElement("div");
   actions.className = "card-actions";
   actions.append(source, save);
   if (currentProspectForWebsite) {
     const addToQueue = document.createElement("button");
-    addToQueue.className = "button primary compact";
+    addToQueue.className = "button primary compact website-save-action";
     addToQueue.type = "button";
-    addToQueue.textContent = "确认原页并加入开发队列";
-    addToQueue.addEventListener("click", () => addProspectToDevelopmentQueue(result));
+    addToQueue.textContent = "用所选证据加入开发队列";
+    addToQueue.disabled = true;
+    addToQueue.addEventListener("click", () => {
+      try {
+        addProspectToDevelopmentQueue(selectedWebsiteResearch(result));
+      } catch (error) {
+        updateStatus("#websiteStatus", error.message || "请选择要保留的证据。", "error");
+      }
+    });
     actions.append(addToQueue);
   }
   card.append(heading, contacts, facts);
   const pages = dossierPages(result);
   if (pages) card.append(pages);
-  card.append(actions, evidenceList({ evidence: result.evidence }));
+  card.append(reviewableEvidenceList(result), actions);
+  updateWebsiteSelectionActions();
   return card;
 }
 
@@ -710,6 +795,7 @@ async function searchWebsite(event) {
       product: "Lydia 外贸系统",
       ...payload
     };
+    selectedWebsiteEvidenceIds = new Set();
     renderWebsiteResearch();
     $("#exportWebsiteEvidence").disabled = false;
     const contacts = [

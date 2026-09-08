@@ -165,6 +165,16 @@ input:focus, select:focus { outline: 3px solid rgb(214 255 114 / 70%); border-co
 .dossier-pages summary { color: var(--forest); cursor: pointer; font-size: 13px; font-weight: 760; }
 .dossier-pages ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .dossier-pages a { color: var(--forest); overflow-wrap: anywhere; }
+.evidence-review { margin: 14px 0; border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.evidence-review > summary { color: var(--forest); cursor: pointer; font-size: 13px; font-weight: 800; }
+.selection-count { margin: 10px 0; color: var(--muted); font-size: 12px; }
+.evidence-choice-list { display: grid; gap: 7px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.evidence-choice { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; border-radius: 10px; background: #f7f5ef; padding: 10px; cursor: pointer; }
+.evidence-choice input { width: 17px; height: 17px; margin-top: 2px; accent-color: var(--forest); }
+.evidence-choice > span { min-width: 0; display: grid; gap: 4px; }
+.evidence-choice strong { font-size: 11px; color: var(--forest); text-transform: uppercase; }
+.evidence-choice span span { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.evidence-choice a { width: fit-content; color: var(--forest); font-size: 11px; font-weight: 700; }
 
 .compact-drop-zone { display: grid; gap: 5px; border: 1.5px dashed #a8b3aa; border-radius: 16px; background: #f7f8f3; padding: 22px; cursor: pointer; }
 .compact-drop-zone:hover { border-color: var(--forest); background: #eef5ed; }

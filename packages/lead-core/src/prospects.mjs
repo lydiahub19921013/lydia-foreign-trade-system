@@ -270,6 +270,11 @@ export function prospectToLead(input, websiteResearch = {}) {
       address: websiteResearch.addresses?.[0],
       factoryInfo: websiteResearch.factorySignals?.[0]
     },
+    contact: {
+      email: websiteResearch.contacts?.emails?.[0],
+      phone: websiteResearch.contacts?.phones?.[0],
+      whatsapp: websiteResearch.contacts?.whatsapp?.[0]
+    },
     inquiry: {
       message: prospect.signalExcerpt,
       product: prospect.product

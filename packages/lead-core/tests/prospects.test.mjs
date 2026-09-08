@@ -102,10 +102,12 @@ test("only an original-page-reviewed prospect can enter the development queue", 
     originalPageReviewed: true,
     title: "Northstar Demo Distribution",
     addresses: ["1 Example Road"],
+    contacts: { emails: ["sales@northstar.example"], phones: ["+1-555-0100"], whatsapp: [] },
     evidence: [{ kind: "company-website", value: "Northstar", sourceRef: "https://northstar.example/about", status: "candidate" }]
   });
   assert.equal(lead.source, "Public research");
   assert.equal(lead.organization.domain, "northstar.example");
+  assert.equal(lead.contact.email, "sales@northstar.example");
   assert.equal(lead.signals.explicitInquiry, false);
   assert.match(lead.notes, /不是客户主动询盘/);
 });

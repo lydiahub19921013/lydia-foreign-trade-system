@@ -9,7 +9,8 @@ export {
 } from "./relationship.mjs";
 export { findDuplicateCandidates } from "./deduplication.mjs";
 export { mergeEvidenceIntoLead } from "./enrichment.mjs";
-export { assessEmailCandidates, checkEmailCandidateLeadMatch, generateEmailCandidates, normalizeCompanyDomain } from "./email-candidates.mjs";
+export { enrichmentFromEvidenceSelection } from "./evidence-selection.mjs";
+export { assessEmailCandidates, checkCompanyDomainMatch, checkEmailCandidateLeadMatch, generateEmailCandidates, normalizeCompanyDomain } from "./email-candidates.mjs";
 export {
   createProspectSearchPlan,
   normalizePublicProspect,

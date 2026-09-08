@@ -89,19 +89,29 @@ export function assessEmailCandidates(candidates, mailDomainResult, publishedEma
   }).sort((left, right) => Number(right.listedOnWebsite) - Number(left.listedOnWebsite));
 }
 
-export function checkEmailCandidateLeadMatch(lead, candidateDomainInput) {
+export function checkCompanyDomainMatch(lead, candidateDomainInput) {
   const candidateDomain = normalizeCompanyDomain(candidateDomainInput);
   const existingInput = lead?.organization?.domain || lead?.organization?.website;
   if (!existingInput) return { allowed: true, candidateDomain, existingDomain: null, reason: "询盘尚无企业域名" };
   try {
     const existingDomain = normalizeCompanyDomain(existingInput);
+    const allowed = existingDomain === candidateDomain
+      || existingDomain.endsWith(`.${candidateDomain}`)
+      || candidateDomain.endsWith(`.${existingDomain}`);
     return {
-      allowed: existingDomain === candidateDomain,
+      allowed,
       candidateDomain,
       existingDomain,
-      reason: existingDomain === candidateDomain ? "企业域名一致" : "候选邮箱域名与询盘企业域名不一致"
+      reason: allowed ? "企业域名一致" : "候选企业域名与询盘企业域名不一致"
     };
   } catch {
     return { allowed: false, candidateDomain, existingDomain: null, reason: "询盘现有企业域名格式异常" };
   }
+}
+
+export function checkEmailCandidateLeadMatch(lead, candidateDomainInput) {
+  const result = checkCompanyDomainMatch(lead, candidateDomainInput);
+  return result.allowed || !result.existingDomain
+    ? result
+    : { ...result, reason: "候选邮箱域名与询盘企业域名不一致" };
 }

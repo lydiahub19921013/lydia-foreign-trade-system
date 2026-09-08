@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createEvidence,
   assessEmailCandidates,
+  checkCompanyDomainMatch,
   checkEmailCandidateLeadMatch,
   findDuplicateCandidates,
   generateEmailCandidates,
@@ -217,4 +218,13 @@ test("candidate email cannot attach to a lead with a different company domain", 
   const mismatch = checkEmailCandidateLeadMatch({ organization: { domain: "northstar.example" } }, "other.example");
   assert.equal(mismatch.allowed, false);
   assert.match(mismatch.reason, /不一致/);
+});
+
+test("website evidence accepts company subdomains but blocks another company", () => {
+  const lead = { organization: { domain: "northstar.example" } };
+  assert.equal(checkCompanyDomainMatch(lead, "www.northstar.example" ).allowed, true);
+  assert.equal(checkCompanyDomainMatch(lead, "contact.northstar.example").allowed, true);
+  const mismatch = checkCompanyDomainMatch(lead, "harbor.example");
+  assert.equal(mismatch.allowed, false);
+  assert.match(mismatch.reason, /企业域名不一致/);
 });

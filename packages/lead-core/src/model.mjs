@@ -58,6 +58,8 @@ export function createEvidence(input = {}) {
   const status = EVIDENCE_STATUSES.has(input.status)
     ? input.status
     : "candidate";
+  const reviewInput = input.review || {};
+  const reviewDecision = ["accepted", "rejected"].includes(reviewInput.decision) ? reviewInput.decision : null;
 
   return {
     id: input.id || `ev_${stableDigest(JSON.stringify([
@@ -72,7 +74,12 @@ export function createEvidence(input = {}) {
     observedAt: isoDate(input.observedAt),
     confidence: boundedNumber(input.confidence, status === "verified" ? 1 : 0.5),
     status,
-    note: clean(input.note) || null
+    note: clean(input.note) || null,
+    review: reviewDecision ? {
+      decision: reviewDecision,
+      reviewedAt: isoDate(reviewInput.reviewedAt),
+      note: clean(reviewInput.note) || null
+    } : null
   };
 }
 

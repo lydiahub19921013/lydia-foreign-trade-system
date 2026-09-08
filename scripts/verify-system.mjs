@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const ignored = new Set([".git", "node_modules", "coverage", "dist"]);
-const textExtensions = new Set([".js", ".mjs", ".json", ".md", ".txt", ".yml", ".yaml", ".csv", ""]);
+const textExtensions = new Set([".js", ".mjs", ".json", ".md", ".txt", ".yml", ".yaml", ".csv", ".html", ".css", ""]);
 const forbiddenIdentities = [
   /trade\s*cubic/iu,
   /tianjin[-\s_]yunmai/iu,

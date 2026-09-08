@@ -14,6 +14,12 @@ Lydia 自有的外贸获客工作台。它把散落的询盘、公开企业信�
 需要 Node.js 20 或更高版本，无需安装第三方依赖。
 
 ```bash
+npm run workbench
+```
+
+然后打开终端显示的本机地址，在网页里导入询盘、查看分级并导出 Lydia 分级结果。也可以继续使用命令行：
+
+```bash
 npm run qualify -- examples/inquiries.sample.csv
 npm run qualify -- examples/inquiries.sample.csv --output ./qualification-results.json
 npm run check
@@ -24,6 +30,7 @@ npm run check
 ## 系统边界
 
 - `packages/lead-core`：统一客户、证据、分级和关系路径模型。
+- `apps/lead-workbench`：只在本机运行的可视化询盘工作台。
 - `apps/inquiry-qualifier`：可运行的批量询盘分级工具。
 - `apps/communication-extension`：Lydia 的外贸沟通浏览器插件。
 - `integrations`：可选研究/验证适配器；只有明确配置后才启用。

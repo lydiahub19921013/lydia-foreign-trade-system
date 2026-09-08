@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { readFile, writeFile } from "node:fs/promises";
-import { extname, resolve } from "node:path";
-import { leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
+import { basename, extname, resolve } from "node:path";
+import { findDuplicateCandidates, leadsFromCsv, normalizeLead, qualifyLead } from "../../packages/lead-core/src/index.mjs";
 
 function usage() {
   return "用法：npm run qualify -- <inquiries.csv|json> [--output result.json]";
@@ -36,10 +36,13 @@ if (!args.input) {
     const inputPath = resolve(args.input);
     const leads = await loadLeads(inputPath);
     const result = {
+      format: "lydia-qualified-leads",
+      schemaVersion: 1,
       product: "Lydia 外贸系统",
       generatedAt: new Date().toISOString(),
-      sourceFile: inputPath,
+      sourceFile: basename(inputPath),
       count: leads.length,
+      duplicateCandidates: findDuplicateCandidates(leads),
       results: leads.map((lead) => ({
         lead,
         qualification: qualifyLead(lead)

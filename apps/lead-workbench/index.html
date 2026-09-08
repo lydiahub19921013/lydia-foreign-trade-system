@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Lydia 外贸系统</title>
+    <link rel="stylesheet" href="/apps/lead-workbench/styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <nav>
+        <a class="brand" href="#top" aria-label="Lydia 外贸系统首页">
+          <span class="brand-mark">L</span>
+          <span>Lydia 外贸系统</span>
+        </a>
+        <span class="local-badge">本地运行 · 不自动上传</span>
+      </nav>
+
+      <div id="top" class="hero-grid">
+        <div>
+          <p class="eyebrow">EVIDENCE-LED EXPORT SALES</p>
+          <h1>别让所有询盘，<br /><em>排在同一优先级。</em></h1>
+          <p class="hero-copy">导入阿里巴巴、中国制造网或自己的表格，用证据、需求和购买动作筛出更值得跟进的客户。</p>
+        </div>
+        <div class="hero-metric" aria-label="工作原则">
+          <span>01</span>
+          <strong>先处理已有询盘</strong>
+          <p>离成交最近、数据最可控，也是最容易验证价值的一步。</p>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="import-panel" aria-labelledby="import-title">
+        <div class="panel-heading">
+          <div>
+            <p class="section-label">STEP 01 · 导入</p>
+            <h2 id="import-title">把询盘放进来</h2>
+          </div>
+          <button id="loadSample" class="button ghost" type="button">使用虚构样例</button>
+        </div>
+
+        <label id="dropZone" class="drop-zone" for="leadFile">
+          <input id="leadFile" type="file" accept=".csv,.json,text/csv,application/json" />
+          <span class="drop-icon">↗</span>
+          <strong>选择 CSV 或 JSON 文件</strong>
+          <small>文件只在当前浏览器页面处理，不会由本工作台上传。</small>
+        </label>
+        <p id="status" class="status" role="status" aria-live="polite">尚未导入数据。</p>
+      </section>
+
+      <section id="dashboard" class="dashboard hidden" aria-labelledby="result-title">
+        <div class="panel-heading results-heading">
+          <div>
+            <p class="section-label">STEP 02 · 分级</p>
+            <h2 id="result-title">今天先跟进谁？</h2>
+          </div>
+          <div class="toolbar">
+            <label>
+              <span class="sr-only">筛选等级</span>
+              <select id="gradeFilter">
+                <option value="ALL">全部等级</option>
+                <option value="A">A · 优先开发</option>
+                <option value="B">B · 值得补证</option>
+                <option value="C">C · 先确认</option>
+                <option value="D">D · 暂缓</option>
+                <option value="HOLD">HOLD · 暂停</option>
+              </select>
+            </label>
+            <button id="exportResults" class="button primary" type="button">导出给沟通插件</button>
+          </div>
+        </div>
+
+        <div id="summary" class="summary-grid"></div>
+
+        <div id="duplicateNotice" class="duplicate-notice hidden"></div>
+        <div id="leadList" class="lead-list"></div>
+      </section>
+
+      <section class="principles">
+        <p class="section-label">系统不会替你做的事</p>
+        <div class="principle-grid">
+          <article><span>×</span><h3>不会把猜测当事实</h3><p>候选邮箱、官网自述和不确定结果会保留状态。</p></article>
+          <article><span>×</span><h3>不会自动群发</h3><p>分级和回复都需要人工确认，不代替业务判断。</p></article>
+          <article><span>×</span><h3>不会按国籍评分</h3><p>只看与需求、证据和购买动作直接相关的信息。</p></article>
+        </div>
+      </section>
+    </main>
+
+    <footer>LYDIA · 外贸线索有证据、有优先级、有下一步</footer>
+    <script type="module" src="/apps/lead-workbench/app.mjs"></script>
+  </body>
+</html>

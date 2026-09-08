@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   createEvidence,
+  findDuplicateCandidates,
   leadsFromCsv,
   normalizeLead,
   parseCsv,
@@ -91,4 +92,20 @@ test("declined relationship paths are excluded", () => {
     { connectorId: "no", targetId: "buyer", relationshipStrength: 5, consentStatus: "declined" }
   ], { now: "2026-09-08" });
   assert.equal(ranked.length, 0);
+});
+
+test("stable lead IDs are identical for the same input in browser-safe core", () => {
+  const input = { source: "Manual", sourceReference: "DEMO-005", organization: { name: "Demo" } };
+  assert.equal(normalizeLead(input).id, normalizeLead(input).id);
+});
+
+test("duplicate detection distinguishes strong domain matches from weak name matches", () => {
+  const duplicates = findDuplicateCandidates([
+    { id: "a", organization: { name: "Demo Buyer", country: "Exampleland", website: "https://buyer.example/about" } },
+    { id: "b", organization: { name: "Demo Buyer", country: "Exampleland", domain: "buyer.example" } }
+  ]);
+  assert.equal(duplicates.length, 1);
+  assert.equal(duplicates[0].confidence, 0.95);
+  assert.equal(duplicates[0].automaticHoldRecommended, true);
+  assert.ok(duplicates[0].reasons.includes("相同企业域名"));
 });

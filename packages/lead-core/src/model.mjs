@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 export const SCHEMA_VERSION = 1;
 
 const EVIDENCE_STATUSES = new Set([
@@ -30,6 +28,20 @@ function isoDate(value) {
   return Number.isNaN(date.valueOf()) ? null : date.toISOString();
 }
 
+function hashText(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function stableDigest(value) {
+  const text = String(value);
+  return `${hashText(text)}${hashText([...text].reverse().join(""))}`;
+}
+
 function stableLeadId(input) {
   const seed = [
     input.source,
@@ -39,7 +51,7 @@ function stableLeadId(input) {
     input.inquiry?.message
   ].map(clean).join("|");
 
-  return `lead_${createHash("sha256").update(seed || "empty-lead").digest("hex").slice(0, 12)}`;
+  return `lead_${stableDigest(seed || "empty-lead").slice(0, 12)}`;
 }
 
 export function createEvidence(input = {}) {
@@ -48,15 +60,12 @@ export function createEvidence(input = {}) {
     : "candidate";
 
   return {
-    id: input.id || `ev_${createHash("sha256")
-      .update(JSON.stringify([
+    id: input.id || `ev_${stableDigest(JSON.stringify([
         input.kind,
         input.value,
         input.sourceRef,
         input.observedAt
-      ]))
-      .digest("hex")
-      .slice(0, 12)}`,
+      ])).slice(0, 12)}`,
     kind: clean(input.kind) || "unknown",
     value: input.value ?? null,
     sourceRef: clean(input.sourceRef) || null,

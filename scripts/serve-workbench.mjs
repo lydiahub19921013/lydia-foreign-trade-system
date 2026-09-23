@@ -11,8 +11,10 @@ import { fetchPublicWebsiteSnapshot } from "../integrations/public-website/snaps
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const entryPage = resolve(repositoryRoot, "apps/lead-workbench/index.html");
+const tradeDocumentsEntryPage = resolve(repositoryRoot, "apps/trade-documents/index.html");
 const publicRoots = [
   resolve(repositoryRoot, "apps/lead-workbench"),
+  resolve(repositoryRoot, "apps/trade-documents"),
   resolve(repositoryRoot, "packages/lead-core/src"),
   resolve(repositoryRoot, "examples")
 ];
@@ -29,6 +31,7 @@ const contentTypes = {
 function requestedFile(requestUrl) {
   const pathname = decodeURIComponent(new URL(requestUrl, "http://localhost").pathname);
   if (pathname === "/") return entryPage;
+  if (pathname === "/documents") return tradeDocumentsEntryPage;
   const path = resolve(repositoryRoot, pathname.replace(/^\/+/, ""));
   if (path === repositoryRoot || !path.startsWith(`${repositoryRoot}${sep}`)) return null;
   return publicRoots.some((root) => path === root || path.startsWith(`${root}${sep}`)) ? path : null;

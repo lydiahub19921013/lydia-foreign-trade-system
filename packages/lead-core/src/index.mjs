@@ -45,3 +45,4 @@ export {
   rankPublicProspects,
   scorePublicProspect
 } from "./prospects.mjs";
+export { createTradeDocumentBundle, normalizeTradeWorkspace, renderTradeDocumentText } from "./trade-documents.mjs";

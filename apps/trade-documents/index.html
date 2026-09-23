@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Lydia 本地外贸成交单证工作台" />
+    <title>Lydia 成交单证工作台</title>
+    <link rel="stylesheet" href="/apps/trade-documents/styles.css" />
+  </head>
+  <body>
+    <header><a href="/">← 返回询盘工作台</a><span>LOCAL ONLY · DRAFTS</span></header>
+    <main>
+      <section class="intro">
+        <p class="eyebrow">STEP 08 · 成交单证</p>
+        <h1>一次录入，<em>六份可审阅草稿。</em></h1>
+        <p>为同一客户、产品行和价格生成报价单、PI、商业发票、装箱单、销售合同草稿与产品目录。只在浏览器生成，不上传、不发送、不签署。</p>
+      </section>
+      <form id="tradeForm" class="workspace">
+        <fieldset><legend>客户与卖方</legend><div class="grid two">
+          <label>卖方名称<input name="supplierName" required value="Lydia Demo Export Co., Ltd." /></label>
+          <label>卖方联系人<input name="supplierContact" required value="Sales Desk" /></label>
+          <label>卖方地址<input name="supplierAddress" required value="88 Demo Road, Ningbo, China" /></label>
+          <label>买方名称<input name="buyerName" required value="Northstar Demo Imports" /></label>
+          <label>买方联系人<input name="buyerContact" required value="Alex Buyer" /></label>
+          <label>买方地址<input name="buyerAddress" required value="1 Example Street, Seattle, US" /></label>
+        </div></fieldset>
+        <fieldset><legend>交易条款</legend><div class="grid three">
+          <label>币种<input name="currency" required maxlength="3" value="USD" /></label>
+          <label>贸易术语<input name="incoterm" required value="FOB Ningbo" /></label>
+          <label>报价有效期（天）<input name="validityDays" required type="number" min="1" value="30" /></label>
+          <label>单证编号（可留空）<input name="reference" placeholder="留空则自动生成草稿编号" /></label>
+          <label>出具日期<input name="issueDate" required type="date" /></label>
+          <label>付款条款<input name="paymentTerms" required value="T/T 30% deposit, 70% before shipment" /></label>
+        </div><label>备注<textarea name="notes" placeholder="例如：请人工核对收货人、HS 编码、唛头、目的港、税务及清关要求。"></textarea></label></fieldset>
+        <fieldset><legend>产品行</legend><div class="item-grid">
+          <label>SKU<input name="sku" required value="DEMO-01" /></label><label>产品名称<input name="productName" required value="Demo Garden Light" /></label><label>规格<input name="specification" value="Warm white" /></label>
+          <label>数量<input name="quantity" required type="number" min="0.01" step="0.01" value="2000" /></label><label>单位<input name="unit" required value="pcs" /></label><label>单价<input name="unitPrice" required type="number" min="0.01" step="0.01" value="4.50" /></label>
+          <label>箱数<input name="cartonCount" required type="number" min="1" value="100" /></label><label>毛重 kg<input name="grossWeightKg" required type="number" min="0.01" step="0.01" value="1200" /></label><label>净重 kg<input name="netWeightKg" required type="number" min="0.01" step="0.01" value="1100" /></label>
+        </div></fieldset>
+        <button class="primary" type="submit">生成 6 份本地草稿</button>
+        <p id="status" role="status">所有字段均为虚构样例；生成后请逐份审核。</p>
+      </form>
+      <section id="results" class="results hidden" aria-live="polite"><div class="result-heading"><div><p class="eyebrow">REVIEW QUEUE</p><h2>先审再用</h2></div><strong id="total"></strong></div><p class="notice">这些是商业草稿，不能证明付款、形成合同、完成报关或替代税务、银行和法律审核。</p><div id="documentList"></div></section>
+    </main>
+    <footer>Lydia 外贸系统 · 客户资料仅由你保留在本机浏览器中</footer>
+    <script type="module" src="/apps/trade-documents/app.mjs"></script>
+  </body>
+</html>

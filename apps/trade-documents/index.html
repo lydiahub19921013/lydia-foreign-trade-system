@@ -4,45 +4,68 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Lydia 本地外贸成交单证工作台" />
-    <title>Lydia 成交单证工作台</title>
+    <meta name="theme-color" content="#183745" />
+    <title>成交单证工作台 · Lydia</title>
     <link rel="stylesheet" href="/apps/trade-documents/styles.css" />
   </head>
   <body>
-    <header><a href="/">← 返回询盘工作台</a><span>LOCAL ONLY · DRAFTS</span></header>
-    <main>
-      <section class="intro">
-        <p class="eyebrow">STEP 08 · 成交单证</p>
-        <h1>一次录入，<em>六份可审阅草稿。</em></h1>
-        <p>为同一客户、产品行和价格生成报价单、PI、商业发票、装箱单、销售合同草稿与产品目录。只在浏览器生成，不上传、不发送、不签署。</p>
+    <a class="skip-link" href="#tradeForm">跳到订单资料</a>
+    <header class="masthead">
+      <div class="masthead-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">L</span><span><strong>Lydia</strong><small>成交单证工作台</small></span></div>
+        <div class="header-actions"><span class="local-state">本机生成 · 待人工审核</span><a href="/">返回询盘工作台</a></div>
+      </div>
+    </header>
+    <main class="desk">
+      <section class="editor" aria-labelledby="editor-title">
+        <div class="section-top"><div><p class="section-kicker">当前订单</p><h1 id="editor-title">把订单资料放到一起</h1></div><span id="sampleTag" class="sample-tag">内置示例</span></div>
+        <p class="editor-intro">页面以演示资料开场。替换成自己的订单，再生成六份待审单证。</p>
+        <form id="tradeForm" autocomplete="off">
+          <details class="editor-group" open><summary><span class="summary-icon" aria-hidden="true">01</span><span><strong>客户与卖方</strong><small>确认单证抬头和联系信息</small></span></summary>
+            <fieldset class="field-grid"><legend class="visually-hidden">客户与卖方</legend>
+              <label class="wide">卖方名称<input name="supplierName" required autocomplete="organization" value="Lydia Demo Export Co., Ltd." /></label>
+              <label>卖方联系人<input name="supplierContact" required autocomplete="off" value="Sales Desk" /></label>
+              <label class="wide">卖方地址<input name="supplierAddress" required autocomplete="off" value="88 Demo Road, Ningbo, China" /></label>
+              <label class="wide">买方名称<input name="buyerName" required autocomplete="off" value="Northstar Demo Imports" /></label>
+              <label>买方联系人<input name="buyerContact" required autocomplete="off" value="Alex Buyer" /></label>
+              <label class="wide">买方地址<input name="buyerAddress" required autocomplete="off" value="1 Example Street, Seattle, US" /></label>
+            </fieldset>
+          </details>
+          <details class="editor-group" open><summary><span class="summary-icon" aria-hidden="true">02</span><span><strong>本次产品</strong><small>同一产品行贯穿六份单证</small></span></summary>
+            <fieldset class="field-grid"><legend class="visually-hidden">本次产品</legend>
+              <label>SKU<input name="sku" required spellcheck="false" value="DEMO-01" /></label>
+              <label class="wide">产品名称<input name="productName" required value="Demo Garden Light" /></label>
+              <label class="wide">规格<input name="specification" value="Warm white" /></label>
+              <label>数量<input name="quantity" required type="number" min="0.01" step="0.01" value="2000" /></label>
+              <label>单位<input name="unit" required value="pcs" /></label>
+              <label>单价<input name="unitPrice" required type="number" min="0.01" step="0.01" value="4.50" /></label>
+            </fieldset>
+          </details>
+          <details class="editor-group"><summary><span class="summary-icon" aria-hidden="true">03</span><span><strong>条款与包装</strong><small>价格、箱数和日期需再次核对</small></span></summary>
+            <fieldset class="field-grid"><legend class="visually-hidden">条款与包装</legend>
+              <label>币种<input name="currency" required maxlength="3" spellcheck="false" value="USD" /></label>
+              <label>贸易术语<input name="incoterm" required value="FOB Ningbo" /></label>
+              <label>有效期（天）<input name="validityDays" required type="number" min="1" step="1" value="30" /></label>
+              <label>单证编号<input name="reference" placeholder="例如：ORDER-2026-01…" spellcheck="false" /></label>
+              <label>出具日期<input name="issueDate" required type="date" /></label>
+              <label class="wide">付款条款<input name="paymentTerms" required value="T/T 30% deposit, 70% before shipment" /></label>
+              <label>箱数<input name="cartonCount" required type="number" min="1" step="1" value="100" /></label>
+              <label>毛重 kg<input name="grossWeightKg" required type="number" min="0.01" step="0.01" value="1200" /></label>
+              <label>净重 kg<input name="netWeightKg" required type="number" min="0.01" step="0.01" value="1100" /></label>
+              <label class="wide">备注<textarea name="notes" rows="3" placeholder="例如：核对唛头、港口、清关要求…"></textarea></label>
+            </fieldset>
+          </details>
+          <div class="form-actions"><button class="generate-button" type="submit">生成六份待审草稿</button><p id="status" role="status">修改左侧资料，右侧预览会同步更新。</p></div>
+        </form>
       </section>
-      <form id="tradeForm" class="workspace">
-        <fieldset><legend>客户与卖方</legend><div class="grid two">
-          <label>卖方名称<input name="supplierName" required value="Lydia Demo Export Co., Ltd." /></label>
-          <label>卖方联系人<input name="supplierContact" required value="Sales Desk" /></label>
-          <label>卖方地址<input name="supplierAddress" required value="88 Demo Road, Ningbo, China" /></label>
-          <label>买方名称<input name="buyerName" required value="Northstar Demo Imports" /></label>
-          <label>买方联系人<input name="buyerContact" required value="Alex Buyer" /></label>
-          <label>买方地址<input name="buyerAddress" required value="1 Example Street, Seattle, US" /></label>
-        </div></fieldset>
-        <fieldset><legend>交易条款</legend><div class="grid three">
-          <label>币种<input name="currency" required maxlength="3" value="USD" /></label>
-          <label>贸易术语<input name="incoterm" required value="FOB Ningbo" /></label>
-          <label>报价有效期（天）<input name="validityDays" required type="number" min="1" value="30" /></label>
-          <label>单证编号（可留空）<input name="reference" placeholder="留空则自动生成草稿编号" /></label>
-          <label>出具日期<input name="issueDate" required type="date" /></label>
-          <label>付款条款<input name="paymentTerms" required value="T/T 30% deposit, 70% before shipment" /></label>
-        </div><label>备注<textarea name="notes" placeholder="例如：请人工核对收货人、HS 编码、唛头、目的港、税务及清关要求。"></textarea></label></fieldset>
-        <fieldset><legend>产品行</legend><div class="item-grid">
-          <label>SKU<input name="sku" required value="DEMO-01" /></label><label>产品名称<input name="productName" required value="Demo Garden Light" /></label><label>规格<input name="specification" value="Warm white" /></label>
-          <label>数量<input name="quantity" required type="number" min="0.01" step="0.01" value="2000" /></label><label>单位<input name="unit" required value="pcs" /></label><label>单价<input name="unitPrice" required type="number" min="0.01" step="0.01" value="4.50" /></label>
-          <label>箱数<input name="cartonCount" required type="number" min="1" value="100" /></label><label>毛重 kg<input name="grossWeightKg" required type="number" min="0.01" step="0.01" value="1200" /></label><label>净重 kg<input name="netWeightKg" required type="number" min="0.01" step="0.01" value="1100" /></label>
-        </div></fieldset>
-        <button class="primary" type="submit">生成 6 份本地草稿</button>
-        <p id="status" role="status">所有字段均为虚构样例；生成后请逐份审核。</p>
-      </form>
-      <section id="results" class="results hidden" aria-live="polite"><div class="result-heading"><div><p class="eyebrow">REVIEW QUEUE</p><h2>先审再用</h2></div><strong id="total"></strong></div><p class="notice">这些是商业草稿，不能证明付款、形成合同、完成报关或替代税务、银行和法律审核。</p><div id="documentList"></div></section>
+      <section id="results" class="documents" aria-labelledby="documents-title">
+        <div class="documents-heading"><div><p class="section-kicker">单证预览</p><h2 id="documents-title">同一笔订单，六张文件</h2></div><div class="bundle-summary"><span id="bundleState">填写预览</span><strong id="total">—</strong></div></div>
+        <nav id="documentList" class="document-switcher" aria-label="选择单证"></nav>
+        <div class="preview-toolbar"><span id="previewState">填写预览</span><button id="downloadButton" type="button" disabled>下载当前 TXT 草稿</button></div>
+        <div id="paperMount" class="paper-mount"><p class="preview-message">正在整理当前订单的单证预览…</p></div>
+        <p class="review-note">草稿不代表付款、签约或清关完成。正式使用前请核对价格、箱数、贸易条款及外部要求。</p>
+      </section>
     </main>
-    <footer>Lydia 外贸系统 · 客户资料仅由你保留在本机浏览器中</footer>
     <script type="module" src="/apps/trade-documents/app.mjs"></script>
   </body>
 </html>

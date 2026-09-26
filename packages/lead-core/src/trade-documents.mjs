@@ -126,6 +126,13 @@ function documentFields(type, workspace, totals) {
 export function renderTradeDocumentText(document) {
   if (!document || typeof document !== "object" || !DOCUMENT_TYPES.includes(document.type)) throw new Error("单证类型不正确");
   const fields = document.fields;
+  const packing = document.type === "packing-list";
+  const catalog = document.type === "product-catalog";
+  const columns = packing
+    ? "SKU | Product | Specification | Quantity | Cartons | Gross weight kg | Net weight kg"
+    : catalog
+      ? "SKU | Product | Specification | Quantity"
+      : "SKU | Product | Specification | Quantity | Unit price | Line total";
   const lines = [
     document.title.toUpperCase(),
     `DRAFT · ${document.reference}`,
@@ -133,14 +140,20 @@ export function renderTradeDocumentText(document) {
     `Seller: ${fields.seller.name} | ${fields.seller.address} | ${fields.seller.contact}`,
     fields.buyer ? `Buyer: ${fields.buyer.name} | ${fields.buyer.address} | ${fields.buyer.contact}` : "",
     "",
-    "SKU | Product | Specification | Quantity | Unit price | Line total"
+    columns
   ];
-  for (const item of fields.items) lines.push(`${item.sku} | ${item.name} | ${item.specification || "-"} | ${item.quantity} ${item.unit} | ${fields.currency || ""} ${item.unitPrice ?? "-"} | ${fields.currency || ""} ${item.lineTotal ?? "-"}`);
-  if (fields.totalAmount != null) lines.push(`Total: ${fields.currency} ${fields.totalAmount}`);
+  for (const item of fields.items) {
+    const shared = `${item.sku} | ${item.name} | ${item.specification || "-"} | ${item.quantity} ${item.unit}`;
+    if (packing) lines.push(`${shared} | ${item.cartonCount} | ${item.grossWeightKg} | ${item.netWeightKg}`);
+    else if (catalog) lines.push(shared);
+    else lines.push(`${shared} | ${fields.currency} ${item.unitPrice} | ${fields.currency} ${item.lineTotal}`);
+  }
+  if (fields.totalAmount != null && !packing) lines.push(`Total: ${fields.currency} ${fields.totalAmount}`);
   if (fields.incoterm) lines.push(`Incoterm: ${fields.incoterm}`);
   if (fields.paymentTerms) lines.push(`Payment terms: ${fields.paymentTerms}`);
   if (fields.totalCartons != null) lines.push(`Packing: ${fields.totalCartons} cartons; G.W. ${fields.grossWeightKg} kg; N.W. ${fields.netWeightKg} kg`);
   if (fields.validUntilDays) lines.push(`Validity: ${fields.validUntilDays} days`);
+  if (fields.notes) lines.push(`Notes: ${fields.notes}`);
   lines.push("", "STATUS: DRAFT — review commercial, customs, tax, banking and legal requirements before external use. No sending, signing or payment is performed by Lydia.");
   return lines.filter(Boolean).join("\n");
 }

@@ -27,3 +27,14 @@ test("transaction documents reject incomplete buyer and non-positive commercial 
   assert.throws(() => createTradeDocumentBundle({ ...fixture, buyer: { ...fixture.buyer, name: "" } }), /买方名称不能为空/);
   assert.throws(() => createTradeDocumentBundle({ ...fixture, items: [{ ...fixture.items[0], unitPrice: 0 }] }), /单价必须大于 0/);
 });
+
+test("packing and catalog text exports match their document-specific previews", () => {
+  const bundle = createTradeDocumentBundle(fixture);
+  const packing = renderTradeDocumentText(bundle.documents.find((document) => document.type === "packing-list"));
+  const catalog = renderTradeDocumentText(bundle.documents.find((document) => document.type === "product-catalog"));
+  assert.match(packing, /Cartons \| Gross weight kg \| Net weight kg/);
+  assert.match(packing, /DEMO-01 .*\| 100 \| 1200 \| 1100/);
+  assert.doesNotMatch(packing, /Unit price|Total: USD/);
+  assert.match(catalog, /SKU \| Product \| Specification \| Quantity/);
+  assert.doesNotMatch(catalog, /Unit price|Total: USD|Buyer:/);
+});
